@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% block titulo %}{{ nombre_evento }}{% endblock %}</title>
+    <meta name="theme-color" content="#0b0b0f">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎫</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Karla:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --negro: #0b0b0f;
+            --negro-2: #12121a;
+            --papel: #f2ecdf;
+            --papel-osc: #e4dcc9;
+            --tinta: #17150f;
+            --lima: #d9ff3d;
+            --lima-suave: rgba(217, 255, 61, 0.14);
+            --texto: #ecebe6;
+            --texto-suave: #8b8a94;
+            --rojo: #ff4d4d;
+            --linea: rgba(255, 255, 255, 0.09);
+            --cubic: cubic-bezier(0.32, 0.72, 0, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { -webkit-text-size-adjust: 100%; }
+
+        body {
+            min-height: 100vh;
+            min-height: 100dvh;
+            background:
+                radial-gradient(900px 520px at 90% -12%, rgba(217, 255, 61, 0.06), transparent 60%),
+                radial-gradient(760px 480px at -12% 28%, rgba(120, 90, 255, 0.07), transparent 60%),
+                var(--negro);
+            font-family: 'Karla', system-ui, sans-serif;
+            color: var(--texto);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 16px calc(110px + env(safe-area-inset-bottom));
+        }
+
+        /* Grano cinematografico fijo */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: 5;
+            pointer-events: none;
+            opacity: 0.35;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='0.045'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        }
+
+        /* ---------- Header ---------- */
+        .header {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 26px;
+            animation: sube 0.6s var(--cubic) both;
+        }
+
+        .brand { display: flex; align-items: center; gap: 12px; }
+
+        .brand .sello {
+            width: 42px;
+            height: 42px;
+            border: 2px solid var(--lima);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.05rem;
+            color: var(--lima);
+            background: var(--lima-suave);
+            transform: rotate(-8deg);
+        }
+
+        .brand .titulo {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 1.02rem;
+            letter-spacing: 0.06em;
+            line-height: 1.15;
+            text-transform: uppercase;
+        }
+
+        .brand .subtitulo {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.6rem;
+            letter-spacing: 0.22em;
+            color: var(--texto-suave);
+            text-transform: uppercase;
+            margin-top: 3px;
+        }
+
+        .btn-logout {
+            background: transparent;
+            border: 1px solid var(--linea);
+            color: var(--texto-suave);
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.68rem;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+            transition: all 0.35s var(--cubic);
+        }
+
+        .btn-logout:hover { color: var(--rojo); border-color: rgba(255, 77, 77, 0.5); }
+
+        /* ---------- Contenido ---------- */
+        .contenido {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: sube 0.6s 0.08s var(--cubic) both;
+        }
+
+        /* ---------- Tab bar: isla flotante ---------- */
+        .tabbar {
+            position: fixed;
+            bottom: calc(14px + env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            gap: 4px;
+            padding: 6px;
+            background: rgba(14, 14, 20, 0.82);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--linea);
+            border-radius: 999px;
+            box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
+        }
+
+        .tabbar a {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 9px 18px;
+            border-radius: 999px;
+            text-decoration: none;
+            color: var(--texto-suave);
+            font-family: 'Space Mono', monospace;
+            font-size: 0.6rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            transition: all 0.35s var(--cubic);
+        }
+
+        .tabbar a .ico { font-size: 1.05rem; line-height: 1; }
+
+        .tabbar a.activo {
+            color: var(--negro);
+            background: var(--lima);
+            font-weight: 700;
+        }
+
+        .tabbar a:active { transform: scale(0.92); }
+
+        /* ---------- Componentes ---------- */
+        .btn-primario {
+            width: 100%;
+            padding: 17px;
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 0.98rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--negro);
+            background: var(--lima);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.35s var(--cubic), box-shadow 0.35s var(--cubic);
+            box-shadow: 0 8px 30px rgba(217, 255, 61, 0.22);
+        }
+
+        .btn-primario:hover { transform: translateY(-2px) scale(1.01); box-shadow: 0 12px 38px rgba(217, 255, 61, 0.32); }
+
+        .btn-primario:active { transform: scale(0.97); }
+
+        .btn-primario:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+        .btn-secundario {
+            background: transparent;
+            border: 1px solid var(--linea);
+            color: var(--texto);
+            padding: 11px 16px;
+            border-radius: 999px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.72rem;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+            transition: all 0.35s var(--cubic);
+        }
+
+        .btn-secundario:hover { border-color: var(--lima); color: var(--lima); }
+
+        .eyebrow {
+            display: inline-block;
+            padding: 5px 12px;
+            border: 1px solid var(--linea);
+            border-radius: 999px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.58rem;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--texto-suave);
+        }
+
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.6rem;
+            letter-spacing: 0.12em;
+            color: var(--texto-suave);
+            text-transform: uppercase;
+        }
+
+        .footer .evento { color: var(--lima); }
+
+        /* ---------- Toast ---------- */
+        .toast {
+            position: fixed;
+            bottom: calc(96px + env(safe-area-inset-bottom));
+            left: 50%;
+            transform: translateX(-50%) translateY(16px);
+            background: var(--negro-2);
+            border: 1px solid var(--lima);
+            color: var(--lima);
+            padding: 12px 22px;
+            border-radius: 999px;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.72rem;
+            letter-spacing: 0.05em;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s var(--cubic);
+            z-index: 200;
+            max-width: 90vw;
+            text-align: center;
+        }
+
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* ---------- Animaciones ---------- */
+        @keyframes sube {
+            from { opacity: 0; transform: translateY(18px); filter: blur(6px); }
+            to { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+
+        @keyframes pop {
+            0% { opacity: 0; transform: scale(0.94); filter: blur(4px); }
+            100% { opacity: 1; transform: scale(1); filter: blur(0); }
+        }
+
+        @media (max-width: 380px) {
+            body { padding-left: 12px; padding-right: 12px; }
+            .tabbar a { padding: 8px 13px; }
+        }
+    </style>
+    {% block estilos %}{% endblock %}
+</head>
+<body>
+    {% if request.path != '/login' %}
+    <header class="header">
+        <div class="brand">
+            <div class="sello">🎫</div>
+            <div>
+                <div class="titulo">{{ nombre_evento }}</div>
+                <div class="subtitulo">Sistema de Entradas</div>
+            </div>
+        </div>
+        <button class="btn-logout" id="btnLogout">Salir</button>
+    </header>
+    {% endif %}
+
+    <main class="contenido">
+        {% block content %}{% endblock %}
+    </main>
+
+    <div class="footer">
+        <span class="evento">{{ nombre_evento }}</span> &middot; Sistema de Entradas Digitales
+    </div>
+
+    {% if request.path != '/login' %}
+    <nav class="tabbar">
+        {% if rol == 'vendedor' %}
+        <a href="/vendedor" class="{{ 'activo' if request.path in ['/vendedor', '/'] else '' }}"><span class="ico">🎟️</span>Vendedor</a>
+        {% else %}
+        <a href="/portero" class="{{ 'activo' if request.path == '/portero' else '' }}"><span class="ico">🔎</span>Portero</a>
+        {% endif %}
+        <a href="/centro" class="{{ 'activo' if request.path == '/centro' else '' }}"><span class="ico">📊</span>Centro</a>
+    </nav>
+    <div class="toast" id="toast"></div>
+    <script>
+        const toastEl = document.getElementById('toast');
+        let toastTimer = null;
+        function mostrarToast(msg) {
+            toastEl.textContent = msg;
+            toastEl.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+        }
+        document.getElementById('btnLogout').addEventListener('click', async () => {
+            await fetch('/api/logout', { method: 'POST' });
+            location.href = '/login';
+        });
+    </script>
+    {% endif %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

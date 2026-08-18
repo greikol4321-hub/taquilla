@@ -1,0 +1,566 @@
+{% extends "base.html" %}
+{% block titulo %}Vendedor - {{ nombre_evento }}{% endblock %}
+{% block content %}
+<div class="vendedor-wrap">
+    <div class="counter">
+        <span class="counter-ico">📊</span>
+        <span>Generadas esta sesión</span>
+        <span class="counter-num" id="contador">0</span>
+    </div>
+
+    <div class="comprador-card" id="compradorCard">
+        <div class="comprador-titulo">DATOS DEL COMPRADOR</div>
+        <div class="comprador-grid">
+            <input type="text" id="inputNombre" class="input-data" placeholder="NOMBRE COMPLETO" autocomplete="off" maxlength="80">
+            <input type="text" id="inputCedula" class="input-data" placeholder="CÉDULA" autocomplete="off" maxlength="30">
+        </div>
+        <button class="btn-primario" id="btnGenerar">🎟️ Generar Entrada</button>
+    </div>
+
+    <div class="qr-card" id="qrCard">
+        <div class="qr-placeholder" id="qrPlaceholder">
+            <span class="qr-placeholder-ico">🎟️</span>
+            <span>Completá los datos y generá la entrada</span>
+        </div>
+        <div class="boleto">
+            <div class="boleto-head">
+                <span class="boleto-evento">{{ nombre_evento }}</span>
+                <span class="boleto-nro" id="boletoNro">Nº —</span>
+            </div>
+            <div class="boleto-cuerpo">
+                <div id="qrcode"></div>
+                <div class="codigo-display" id="codigoDisplay">--------</div>
+                <div class="boleto-comprador">
+                    <div class="comprador-linea">
+                        <span class="comprador-label">Comprador</span>
+                        <span class="comprador-valor" id="boletoNombre">—</span>
+                    </div>
+                    <div class="comprador-linea">
+                        <span class="comprador-label">Cédula</span>
+                        <span class="comprador-valor" id="boletoCedula">—</span>
+                    </div>
+                </div>
+                <div class="boleto-valido">ENTRADA VÁLIDA · ADMITIR UNA PERSONA</div>
+            </div>
+            <div class="boleto-talon">
+                <span class="talon-label">TALÓN DE CONTROL</span>
+                <span class="talon-codigo" id="talonCodigo">--------</span>
+            </div>
+        </div>
+        <div class="btn-fila">
+            <button class="btn-copy" id="btnCopy">
+                <span id="copyIcon">📋</span> Copiar
+            </button>
+            <button class="btn-wa" id="btnWhatsApp">
+                <span id="waIcon">🟢</span> WhatsApp
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block estilos %}
+<style>
+    .vendedor-wrap {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .counter {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        border: 1px solid var(--linea);
+        border-radius: 999px;
+        padding: 9px 18px;
+        font-size: 0.78rem;
+        color: var(--texto-suave);
+        font-family: 'Space Mono', monospace;
+        letter-spacing: 0.05em;
+    }
+
+    .counter-ico { font-size: 0.95rem; }
+
+    .counter-num {
+        font-weight: 700;
+        color: var(--lima);
+        font-size: 0.9rem;
+    }
+
+    /* ---------- Datos del comprador ---------- */
+    .comprador-card {
+        width: 100%;
+        max-width: 340px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .comprador-titulo {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.16em;
+        color: var(--texto-suave);
+        text-transform: uppercase;
+        text-align: center;
+    }
+
+    .comprador-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 8px;
+    }
+
+    .input-data {
+        padding: 13px 15px;
+        font-family: 'Karla', sans-serif;
+        font-size: 0.85rem;
+        color: var(--texto);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--linea);
+        border-radius: 10px;
+        outline: none;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .input-data::placeholder { color: var(--texto-suave); font-family: 'Space Mono', monospace; font-size: 0.62rem; letter-spacing: 0.08em; }
+
+    .input-data:focus {
+        border-color: var(--lima);
+        box-shadow: 0 0 0 3px rgba(217, 255, 61, 0.12);
+    }
+
+    .input-data.error {
+        border-color: var(--rojo);
+        animation: shake 0.35s var(--cubic);
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+
+    /* ---------- Tarjeta QR: boleto real ---------- */
+    .qr-card {
+        width: 100%;
+        max-width: 340px;
+        display: none;
+        animation: pop 0.45s var(--cubic) both;
+    }
+
+    .qr-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding: 52px 20px;
+        border: 1px dashed var(--linea);
+        border-radius: 16px;
+        color: var(--texto-suave);
+        font-size: 0.82rem;
+        text-align: center;
+    }
+
+    .qr-placeholder-ico { font-size: 2rem; filter: grayscale(1); opacity: 0.6; }
+
+    .boleto {
+        position: relative;
+        background: var(--papel);
+        color: var(--tinta);
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 22px 60px rgba(0, 0, 0, 0.55);
+    }
+
+    /* Perforaciones laterales */
+    .boleto::before, .boleto::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 26px;
+        background:
+            radial-gradient(circle at 50% 14px, var(--negro) 7px, transparent 7.5px),
+            radial-gradient(circle at 50% 78px, var(--negro) 7px, transparent 7.5px),
+            radial-gradient(circle at 50% 142px, var(--negro) 7px, transparent 7.5px),
+            radial-gradient(circle at 50% 206px, var(--negro) 7px, transparent 7.5px);
+        background-size: 100% auto;
+        z-index: 2;
+    }
+
+    .boleto::before { left: -13px; }
+    .boleto::after { right: -13px; }
+
+    .boleto-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 18px;
+        border-bottom: 2px dashed rgba(23, 21, 15, 0.25);
+    }
+
+    .boleto-evento {
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .boleto-nro {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.14em;
+        color: rgba(23, 21, 15, 0.55);
+        border: 1px solid rgba(23, 21, 15, 0.3);
+        border-radius: 4px;
+        padding: 3px 7px;
+    }
+
+    .boleto-cuerpo {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px 18px 16px;
+    }
+
+    .boleto-cuerpo #qrcode { margin-bottom: 14px; }
+
+    .boleto-cuerpo #qrcode img, .boleto-cuerpo #qrcode canvas {
+        border-radius: 6px;
+        background: #fff;
+        padding: 6px;
+        image-rendering: pixelated;
+    }
+
+    .codigo-display {
+        font-family: 'Space Mono', monospace;
+        font-size: 1.9rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        word-break: break-all;
+        line-height: 1.1;
+    }
+
+    .boleto-valido {
+        margin-top: 10px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.55rem;
+        letter-spacing: 0.16em;
+        color: rgba(23, 21, 15, 0.6);
+    }
+
+    .boleto-comprador {
+        width: 100%;
+        margin-top: 14px;
+        border-top: 2px dashed rgba(23, 21, 15, 0.25);
+        padding-top: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .comprador-linea {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+    }
+
+    .comprador-label {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.52rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: rgba(23, 21, 15, 0.55);
+    }
+
+    .comprador-valor {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-align: right;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 65%;
+    }
+
+    .boleto-talon {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 11px 18px;
+        border-top: 2px dashed rgba(23, 21, 15, 0.25);
+        background: rgba(23, 21, 15, 0.05);
+    }
+
+    .talon-label {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.55rem;
+        letter-spacing: 0.16em;
+        color: rgba(23, 21, 15, 0.6);
+    }
+
+    .talon-codigo {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+    }
+
+    .btn-copy {
+        flex: 1;
+        background: transparent;
+        border: 1px solid var(--linea);
+        color: var(--texto);
+        padding: 13px;
+        border-radius: 10px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .btn-copy:hover { border-color: var(--lima); color: var(--lima); }
+
+    .btn-copy.copied { color: var(--lima); border-color: var(--lima); }
+
+    .btn-fila {
+        width: 100%;
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .btn-wa {
+        flex: 1;
+        background: rgba(37, 211, 102, 0.12);
+        border: 1px solid rgba(37, 211, 102, 0.45);
+        color: #25d366;
+        padding: 13px;
+        border-radius: 10px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .btn-wa:hover { background: #25d366; color: var(--negro); border-color: #25d366; }
+</style>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+    let qrcodeInstance = null;
+    let contador = 0;
+
+    function actualizarContador() {
+        contador++;
+        document.getElementById('contador').textContent = contador;
+    }
+
+    function copiarCodigo() {
+        const codigo = document.getElementById('codigoDisplay').textContent.trim();
+        if (!codigo || codigo.includes('-')) return;
+        navigator.clipboard.writeText(codigo).then(() => {
+            const icon = document.getElementById('copyIcon');
+            icon.textContent = '✓';
+            document.getElementById('btnCopy').classList.add('copied');
+            mostrarToast('¡Código copiado!');
+            setTimeout(() => {
+                icon.textContent = '📋';
+                document.getElementById('btnCopy').classList.remove('copied');
+            }, 2000);
+        }).catch(() => mostrarToast('Error al copiar'));
+    }
+
+    document.getElementById('btnGenerar').addEventListener('click', async () => {
+        const nombre = document.getElementById('inputNombre').value.trim();
+        const cedula = document.getElementById('inputCedula').value.trim();
+        let ok = true;
+
+        [['inputNombre', nombre], ['inputCedula', cedula]].forEach(([id, v]) => {
+            const el = document.getElementById(id);
+            el.classList.toggle('error', !v);
+            if (!v) ok = false;
+        });
+        if (!ok) {
+            mostrarToast('Completá nombre y cédula');
+            return;
+        }
+
+        const btn = document.getElementById('btnGenerar');
+        btn.disabled = true;
+        btn.textContent = 'Generando...';
+
+        try {
+            const res = await fetch('/api/generar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nombre, cedula })
+            });
+            const data = await res.json();
+
+            if (res.status === 401) { location.href = '/login'; return; }
+
+            if (res.ok && data.ok) {
+                const codigo = data.codigo;
+                document.getElementById('codigoDisplay').textContent = codigo;
+                document.getElementById('talonCodigo').textContent = codigo;
+                document.getElementById('boletoNombre').textContent = nombre;
+                document.getElementById('boletoCedula').textContent = cedula;
+                document.getElementById('boletoNro').textContent = 'Nº ' + data.id;
+                document.getElementById('qrPlaceholder').style.display = 'none';
+
+                if (qrcodeInstance) qrcodeInstance.clear();
+                const qrDiv = document.getElementById('qrcode');
+                qrDiv.innerHTML = '';
+                qrcodeInstance = new QRCode(qrDiv, {
+                    text: codigo,
+                    width: 190,
+                    height: 190,
+                    colorDark: '#17150f',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+
+                document.getElementById('qrCard').style.display = 'block';
+                actualizarContador();
+            } else {
+                mostrarToast(data.error || 'Error al generar entrada');
+            }
+        } catch (err) {
+            mostrarToast('Error de conexión');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🎟️ Generar Entrada';
+        }
+    });
+
+    document.getElementById('btnCopy').addEventListener('click', copiarCodigo);
+
+    const NOMBRE_EVENTO = "{{ nombre_evento }}";
+
+    function generarImagenTicket() {
+        const codigo = document.getElementById('codigoDisplay').textContent.trim();
+        const nombre = document.getElementById('boletoNombre').textContent;
+        const cedula = document.getElementById('boletoCedula').textContent;
+        const nro = document.getElementById('boletoNro').textContent;
+        const canvas = document.createElement('canvas');
+        canvas.width = 640;
+        canvas.height = 1020;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#f2ecdf';
+        ctx.fillRect(0, 0, 640, 1020);
+        ctx.fillStyle = '#17150f';
+
+        ctx.setLineDash([12, 9]);
+        ctx.strokeStyle = 'rgba(23, 21, 15, 0.45)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(18, 18, 604, 984);
+        ctx.setLineDash([]);
+
+        ctx.textAlign = 'center';
+        ctx.font = '34px "Archivo Black", sans-serif';
+        ctx.fillText(NOMBRE_EVENTO.toUpperCase(), 320, 88);
+
+        ctx.font = '18px "Space Mono", monospace';
+        ctx.fillText(nro, 320, 128);
+
+        ctx.setLineDash([8, 7]);
+        ctx.beginPath();
+        ctx.moveTo(40, 152);
+        ctx.lineTo(600, 152);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const qrEl = qrcodeInstance ? qrcodeInstance._el : null;
+        if (qrEl) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(140, 180, 360, 360);
+            ctx.drawImage(qrEl, 150, 190, 340, 340);
+        }
+
+        ctx.font = '20px "Space Mono", monospace';
+        ctx.fillText(codigo, 320, 590);
+
+        ctx.setLineDash([8, 7]);
+        ctx.beginPath();
+        ctx.moveTo(40, 620);
+        ctx.lineTo(600, 620);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.font = '11px "Space Mono", monospace';
+        ctx.fillStyle = 'rgba(23, 21, 15, 0.6)';
+        ctx.fillText('COMPRADOR', 320, 660);
+        ctx.fillStyle = '#17150f';
+        ctx.font = '22px "Karla", sans-serif';
+        ctx.fillText(nombre, 320, 694);
+
+        ctx.font = '11px "Space Mono", monospace';
+        ctx.fillStyle = 'rgba(23, 21, 15, 0.6)';
+        ctx.fillText('CÉDULA', 320, 732);
+        ctx.fillStyle = '#17150f';
+        ctx.font = '22px "Karla", sans-serif';
+        ctx.fillText(cedula, 320, 766);
+
+        ctx.setLineDash([8, 7]);
+        ctx.beginPath();
+        ctx.moveTo(40, 796);
+        ctx.lineTo(600, 796);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.font = '13px "Space Mono", monospace';
+        ctx.fillText('ENTRADA VÁLIDA · ADMITIR UNA PERSONA', 320, 830);
+
+        ctx.font = 'bold 26px "Space Mono", monospace';
+        ctx.fillStyle = 'rgba(23, 21, 15, 0.35)';
+        ctx.fillText('TALÓN DE CONTROL', 320, 900);
+        ctx.fillStyle = '#17150f';
+        ctx.fillText(codigo, 320, 944);
+
+        return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    }
+
+    async function compartirWhatsApp() {
+        const codigo = document.getElementById('codigoDisplay').textContent.trim();
+        const nombre = document.getElementById('boletoNombre').textContent;
+        const cedula = document.getElementById('boletoCedula').textContent;
+        if (!codigo || codigo.includes('-')) return;
+
+        const blob = await generarImagenTicket();
+        const file = new File([blob], 'ticket.png', { type: 'image/png' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: NOMBRE_EVENTO,
+                    text: codigo + ' · ' + nombre + ' · CI ' + cedula
+                });
+                return;
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+            }
+        }
+
+        const texto = encodeURIComponent(
+            '🎫 ' + NOMBRE_EVENTO.toUpperCase() +
+            '\nCódigo: ' + codigo +
+            '\nComprador: ' + nombre +
+            '\nCédula: ' + cedula +
+            '\n\nPresentá este código en la entrada.'
+        );
+        window.open('https://wa.me/?text=' + texto, '_blank');
+    }
+
+    document.getElementById('btnWhatsApp').addEventListener('click', compartirWhatsApp);
+</script>
+{% endblock %}

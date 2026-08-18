@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block titulo %}Ingreso - {{ nombre_evento }}{% endblock %}
+{% block content %}
+<div class="login-wrap">
+    <div class="login-boleto">
+        <span class="eyebrow">Acceso Staff</span>
+        <h1 class="login-titulo">Entradas</h1>
+        <p class="login-evento">{{ nombre_evento }}</p>
+        <div class="perforacion"></div>
+
+        <div class="rol-selector" id="rolSelector">
+            <button type="button" class="rol-pill activo" data-rol="vendedor">🎟️ Vendedor</button>
+            <button type="button" class="rol-pill" data-rol="portero">🔎 Portero</button>
+        </div>
+
+        <p class="login-sub" id="rolSub">Vendedor — generá entradas y tickets</p>
+        <input type="password" id="password" class="login-input" placeholder="Contraseña" autocomplete="current-password">
+        <button class="btn-primario" id="btnLogin">Entrar</button>
+        <div class="login-error" id="loginError"></div>
+    </div>
+</div>
+{% endblock %}
+{% block estilos %}
+<style>
+    .login-wrap {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        padding-top: 5vh;
+    }
+
+    .login-boleto {
+        position: relative;
+        width: 100%;
+        max-width: 340px;
+        background: var(--negro-2);
+        border: 1px dashed rgba(217, 255, 61, 0.35);
+        border-radius: 20px;
+        padding: 36px 28px 28px;
+        text-align: center;
+        animation: sube 0.6s var(--cubic) both;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Muescas de talon perforado */
+    .login-boleto::before,
+    .login-boleto::after {
+        content: '';
+        position: absolute;
+        top: 96px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--negro);
+    }
+
+    .login-boleto::before { left: -12px; }
+    .login-boleto::after { right: -12px; }
+
+    .login-titulo {
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 2.3rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin: 12px 0 2px;
+        color: var(--texto);
+    }
+
+    .login-evento {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        color: var(--lima);
+        margin-bottom: 4px;
+    }
+
+    .perforacion {
+        border-top: 2px dashed rgba(255, 255, 255, 0.14);
+        margin: 20px 0;
+    }
+
+    .login-sub {
+        font-size: 0.85rem;
+        color: var(--texto-suave);
+        margin-bottom: 18px;
+    }
+
+    .login-input {
+        width: 100%;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.95rem;
+        text-align: center;
+        letter-spacing: 0.12em;
+        color: var(--texto);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--linea);
+        border-radius: 10px;
+        outline: none;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .login-input:focus {
+        border-color: var(--lima);
+        background: rgba(217, 255, 61, 0.05);
+        box-shadow: 0 0 0 3px rgba(217, 255, 61, 0.12);
+    }
+
+    .login-error {
+        min-height: 20px;
+        margin-top: 12px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.72rem;
+        color: var(--rojo);
+        letter-spacing: 0.05em;
+    }
+
+    .rol-selector {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 14px;
+        padding: 4px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--linea);
+        border-radius: 12px;
+    }
+
+    .rol-pill {
+        flex: 1;
+        padding: 9px 4px;
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        color: var(--texto-suave);
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 0.62rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.35s var(--cubic);
+        white-space: nowrap;
+    }
+
+    .rol-pill:hover { color: var(--texto); }
+
+    .rol-pill.activo {
+        background: var(--lima);
+        color: var(--negro);
+    }
+
+    #rolSub {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.6rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+        margin: -6px 0 14px;
+    }
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+    const input = document.getElementById('password');
+    const btn = document.getElementById('btnLogin');
+    const error = document.getElementById('loginError');
+    const subs = {
+        vendedor: 'Vendedor — generá entradas y tickets',
+        portero: 'Portero — validá entradas en la puerta'
+    };
+    let rol = 'vendedor';
+
+    document.querySelectorAll('.rol-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+            document.querySelectorAll('.rol-pill').forEach(p => p.classList.remove('activo'));
+            pill.classList.add('activo');
+            rol = pill.dataset.rol;
+            document.getElementById('rolSub').textContent = subs[rol];
+        });
+    });
+
+    async function entrar() {
+        const pass = input.value;
+        if (!pass) { error.textContent = 'Ingresá la contraseña'; return; }
+        btn.disabled = true;
+        btn.textContent = 'Entrando...';
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pass, rol: rol })
+            });
+            const data = await res.json();
+            if (res.ok && data.ok) {
+                location.href = '/' + data.rol;
+            } else {
+                error.textContent = data.error || 'Error al ingresar';
+                btn.disabled = false;
+                btn.textContent = 'Entrar';
+                input.value = '';
+                input.focus();
+            }
+        } catch (err) {
+            error.textContent = 'Error de conexión';
+            btn.disabled = false;
+            btn.textContent = 'Entrar';
+        }
+    }
+
+    btn.addEventListener('click', entrar);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') entrar(); });
+    input.focus();
+</script>
+{% endblock %}

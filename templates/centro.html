@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+{% block titulo %}Centro de Datos - {{ nombre_evento }}{% endblock %}
+{% block content %}
+<div class="centro-wrap">
+    <div class="stats">
+        <div class="stat">
+            <span class="stat-num" id="statTotal">—</span>
+            <span class="stat-label">Generadas</span>
+        </div>
+        <div class="stat">
+            <span class="stat-num stat-ok" id="statUsadas">—</span>
+            <span class="stat-label">Usadas</span>
+        </div>
+        <div class="stat">
+            <span class="stat-num stat-accent" id="statPendientes">—</span>
+            <span class="stat-label">Pendientes</span>
+        </div>
+    </div>
+
+    <div class="herramientas">
+        <input type="text" id="busqueda" class="search-input" placeholder="BUSCAR CÓDIGO..." autocomplete="off">
+        <button class="btn-secundario" id="btnExportar">⬇ CSV</button>
+        <button class="btn-borrar" id="btnBorrar" title="Borrar todas y reiniciar IDs">🗑</button>
+    </div>
+
+    <div class="tabla-wrap">
+        <table class="tabla">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Comprador</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="tablaBody">
+                <tr><td colspan="5" class="vacio">Cargando...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block estilos %}
+<style>
+    .centro-wrap { width: 100%; display: flex; flex-direction: column; gap: 16px; }
+
+    .stats {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+
+    .stat {
+        background: var(--negro-2);
+        border: 1px solid var(--linea);
+        border-radius: 14px;
+        padding: 15px 8px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .stat:hover { border-color: rgba(217, 255, 61, 0.35); }
+
+    .stat-num {
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 1.55rem;
+        color: var(--texto);
+    }
+
+    .stat-ok { color: var(--lima); }
+    .stat-accent { color: #8f7bff; }
+
+    .stat-label {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.56rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+    }
+
+    .herramientas {
+        width: 100%;
+        display: flex;
+        gap: 8px;
+    }
+
+    .search-input {
+        flex: 1;
+        padding: 12px 15px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.72rem;
+        letter-spacing: 0.08em;
+        color: var(--texto);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--linea);
+        border-radius: 10px;
+        outline: none;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .search-input::placeholder { color: var(--texto-suave); }
+
+    .search-input:focus {
+        border-color: var(--lima);
+        box-shadow: 0 0 0 3px rgba(217, 255, 61, 0.12);
+    }
+
+    .btn-borrar {
+        background: transparent;
+        border: 1px solid rgba(255, 77, 77, 0.4);
+        color: var(--rojo);
+        padding: 11px 15px;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .btn-borrar:hover {
+        background: rgba(255, 77, 77, 0.12);
+        border-color: var(--rojo);
+    }
+
+    .tabla-wrap {
+        width: 100%;
+        background: var(--negro-2);
+        border: 1px solid var(--linea);
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    .tabla { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+
+    .tabla th {
+        text-align: left;
+        padding: 12px 14px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.56rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+        border-bottom: 1px solid var(--linea);
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tabla td {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .tabla tr:last-child td { border-bottom: none; }
+
+    .tabla .vacio {
+        text-align: center;
+        color: var(--texto-suave);
+        padding: 28px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.7rem;
+    }
+
+    .codigo-cell {
+        font-family: 'Space Mono', monospace;
+        font-weight: 700;
+        font-size: 0.82rem;
+        letter-spacing: 0.12em;
+    }
+
+    .comprador-cell { min-width: 120px; }
+
+    .comprador-nombre {
+        font-size: 0.78rem;
+        font-weight: 700;
+        max-width: 150px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .comprador-cedula {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.58rem;
+        letter-spacing: 0.06em;
+        color: var(--texto-suave);
+        margin-top: 2px;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.55rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+    }
+
+    .badge-usado { background: var(--lima); color: var(--negro); }
+    .badge-pendiente { border: 1px solid rgba(143, 123, 255, 0.5); color: #8f7bff; }
+
+    .fecha-cell { color: var(--texto-suave); font-size: 0.66rem; white-space: nowrap; font-family: 'Space Mono', monospace; }
+
+    .btn-reset {
+        background: transparent;
+        border: 1px solid var(--linea);
+        color: var(--texto-suave);
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .btn-reset:hover {
+        color: var(--lima);
+        border-color: var(--lima);
+        background: var(--lima-suave);
+    }
+</style>
+{% endblock %}
+{% block scripts %}
+<script>
+    let entradas = [];
+
+    async function cargarStats() {
+        try {
+            const res = await fetch('/api/stats');
+            if (res.status === 401) { location.href = '/login'; return; }
+            const data = await res.json();
+            document.getElementById('statTotal').textContent = data.total;
+            document.getElementById('statUsadas').textContent = data.usadas;
+            document.getElementById('statPendientes').textContent = data.pendientes;
+        } catch (err) {
+            mostrarToast('Error al cargar estadísticas');
+        }
+    }
+
+    async function cargarLista() {
+        try {
+            const res = await fetch('/api/listar');
+            if (res.status === 401) { location.href = '/login'; return; }
+            const data = await res.json();
+            entradas = data.entradas || [];
+            renderTabla();
+        } catch (err) {
+            document.getElementById('tablaBody').innerHTML =
+                '<tr><td colspan="4" class="vacio">Error al cargar</td></tr>';
+        }
+    }
+
+    function formatearFecha(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function renderTabla() {
+        const filtro = document.getElementById('busqueda').value.trim().toUpperCase();
+        const filas = entradas.filter(e => !filtro ||
+            e.codigo.includes(filtro) ||
+            (e.nombre || '').toUpperCase().includes(filtro) ||
+            (e.cedula || '').toUpperCase().includes(filtro));
+        const tbody = document.getElementById('tablaBody');
+
+        if (filas.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="vacio">' +
+                (entradas.length === 0 ? 'Todavía no se generaron entradas' : 'Sin resultados') +
+                '</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filas.map(e => `
+            <tr>
+                <td class="codigo-cell">${e.codigo}</td>
+                <td class="comprador-cell">
+                    <div class="comprador-nombre">${e.nombre || '—'}</div>
+                    <div class="comprador-cedula">CI ${e.cedula || '—'}</div>
+                </td>
+                <td><span class="badge ${e.usado ? 'badge-usado' : 'badge-pendiente'}">${e.usado ? 'Usado' : 'Pendiente'}</span></td>
+                <td class="fecha-cell">${formatearFecha(e.creado_en)}</td>
+                <td>${e.usado ? `<button class="btn-reset" title="Marcar no-usado" onclick="resetear('${e.codigo}')">↺</button>` : ''}</td>
+            </tr>
+        `).join('');
+    }
+
+    async function resetear(codigo) {
+        if (!confirm('¿Marcar ' + codigo + ' como no utilizada?')) return;
+        try {
+            const res = await fetch('/api/reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codigo })
+            });
+            const data = await res.json();
+            if (res.status === 401) { location.href = '/login'; return; }
+            if (data.ok) {
+                mostrarToast('Entrada ' + codigo + ' restablecida');
+                cargarStats();
+                cargarLista();
+            } else {
+                mostrarToast(data.error || 'Error');
+            }
+        } catch (err) {
+            mostrarToast('Error de conexión');
+        }
+    }
+
+    document.getElementById('btnExportar').addEventListener('click', () => {
+        location.href = '/api/exportar';
+    });
+
+    document.getElementById('btnBorrar').addEventListener('click', async () => {
+        if (!confirm('⚠️ ¿Borrar TODAS las entradas? Los IDs se reiniciarán desde 1. Esta acción no se puede deshacer.')) return;
+        try {
+            const res = await fetch('/api/borrar_todas', { method: 'POST' });
+            const data = await res.json();
+            if (res.status === 401) { location.href = '/login'; return; }
+            if (data.ok) {
+                mostrarToast('Base reiniciada · IDs desde 1');
+                cargarStats();
+                cargarLista();
+            } else {
+                mostrarToast(data.error || 'Error');
+            }
+        } catch (err) {
+            mostrarToast('Error de conexión');
+        }
+    });
+
+    document.getElementById('busqueda').addEventListener('input', renderTabla);
+
+    cargarStats();
+    cargarLista();
+</script>
+{% endblock %}

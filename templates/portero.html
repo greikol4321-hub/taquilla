@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block titulo %}Portero - {{ nombre_evento }}{% endblock %}
+{% block content %}
+<div class="portero-wrap">
+    <div class="scanner-container">
+        <div class="scanner-frame"></div>
+        <div id="reader"></div>
+    </div>
+
+    <div class="camera-error" id="cameraError">
+        <p>⚠️ No se pudo acceder a la cámara.</p>
+        <p class="camera-error-sub">Concedé permiso de cámara o usá el modo manual abajo.</p>
+    </div>
+
+    <div id="resultado" class="estado-pendiente">
+        <div class="icono">📱</div>
+        <div class="mensaje">Apunta la cámara al código QR de la entrada.</div>
+    </div>
+
+    <div class="manual-container">
+        <div class="hint">Modo manual de respaldo</div>
+        <div class="manual-input-group">
+            <input type="text" id="codigoManual" placeholder="00000000" maxlength="8" autocomplete="off" autocapitalize="characters">
+            <button id="btnValidarManual">Validar</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block estilos %}
+<style>
+    .portero-wrap {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .scanner-container {
+        position: relative;
+        width: 100%;
+        max-width: 340px;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #050508;
+        border: 1px solid var(--linea);
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+    }
+
+    .scanner-frame {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        pointer-events: none;
+        z-index: 2;
+    }
+
+    .scanner-frame::before, .scanner-frame::after {
+        content: '';
+        position: absolute;
+        width: 30px;
+        height: 30px;
+        border: 3px solid var(--lima);
+        box-sizing: border-box;
+    }
+
+    .scanner-frame::before { top: 14px; left: 14px; border-bottom: none; border-right: none; }
+    .scanner-frame::after { top: 14px; right: 14px; border-bottom: none; border-left: none; }
+
+    .scanner-container::after {
+        content: '';
+        position: absolute;
+        bottom: -3px; left: -3px; right: -3px;
+        height: 3px;
+        background: repeating-linear-gradient(90deg, var(--lima), var(--lima) 10px, transparent 10px, transparent 20px);
+        z-index: 1;
+        opacity: 0.55;
+    }
+
+    #reader { width: 100% !important; min-height: 260px; }
+
+    #resultado {
+        width: 100%;
+        max-width: 340px;
+        min-height: 92px;
+        border-radius: 14px;
+        padding: 16px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.4s var(--cubic);
+        font-size: 1rem;
+        background: var(--negro-2);
+        border: 1px solid var(--linea);
+    }
+
+    #resultado .icono { font-size: 1.6rem; margin-bottom: 4px; }
+    #resultado .mensaje { font-weight: 600; line-height: 1.4; font-size: 0.92rem; }
+    #resultado .codigo-validado {
+        font-family: 'Space Mono', monospace;
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        margin-top: 6px;
+        opacity: 0.9;
+    }
+
+    #resultado .datos-validados {
+        width: 100%;
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(217, 255, 61, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.86rem;
+    }
+
+    #resultado .datos-validados div {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+    }
+
+    .dato-label {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.55rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        opacity: 0.65;
+    }
+
+    .dato-valor {
+        font-weight: 700;
+        text-align: right;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 70%;
+    }
+
+    #resultado.estado-exito {
+        background: var(--lima-suave);
+        color: var(--lima);
+        border-color: rgba(217, 255, 61, 0.5);
+        animation: pulso-lima 0.5s ease-out;
+    }
+
+    #resultado.estado-error {
+        background: rgba(255, 77, 77, 0.1);
+        color: var(--rojo);
+        border-color: rgba(255, 77, 77, 0.45);
+        animation: pulso-rojo 0.5s ease-out;
+    }
+
+    @keyframes pulso-lima {
+        0% { box-shadow: 0 0 0 0 rgba(217, 255, 61, 0.45); }
+        100% { box-shadow: 0 0 0 18px rgba(217, 255, 61, 0); }
+    }
+
+    @keyframes pulso-rojo {
+        0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.45); }
+        100% { box-shadow: 0 0 0 18px rgba(255, 77, 77, 0); }
+    }
+
+    .manual-container { width: 100%; max-width: 340px; text-align: center; }
+
+    .manual-container .hint {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.16em;
+        color: var(--texto-suave);
+        text-transform: uppercase;
+        margin-bottom: 8px;
+    }
+
+    .manual-input-group { display: flex; gap: 8px; }
+
+    .manual-input-group input {
+        flex: 1;
+        padding: 13px;
+        font-family: 'Space Mono', monospace;
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--linea);
+        border-radius: 10px;
+        color: var(--texto);
+        outline: none;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .manual-input-group input:focus {
+        border-color: var(--lima);
+        box-shadow: 0 0 0 3px rgba(217, 255, 61, 0.12);
+    }
+
+    .manual-input-group button {
+        padding: 13px 18px;
+        background: transparent;
+        border: 1px solid var(--lima);
+        border-radius: 10px;
+        color: var(--lima);
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 0.78rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .manual-input-group button:hover { background: var(--lima); color: var(--negro); }
+
+    .camera-error {
+        text-align: center;
+        padding: 12px;
+        color: var(--rojo);
+        font-size: 0.86rem;
+        display: none;
+        max-width: 340px;
+    }
+
+    .camera-error.show { display: block; }
+
+    .camera-error-sub { margin-top: 6px; color: var(--texto-suave); font-size: 0.78rem; }
+</style>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+<script>
+    let html5QrCode = null;
+    let scannerActivo = false;
+
+    function mostrarResultado(estado, mensaje, codigo, nombre, cedula) {
+        const resultado = document.getElementById('resultado');
+        const iconoSpan = resultado.querySelector('.icono');
+        const mensajeSpan = resultado.querySelector('.mensaje');
+
+        resultado.className = 'estado-' + estado;
+        iconoSpan.textContent = estado === 'exito' ? '✅' : '⚠️';
+
+        if (estado === 'exito') {
+            mensajeSpan.textContent = 'ACCESO PERMITIDO';
+            if (codigo) {
+                const extra = document.createElement('span');
+                extra.className = 'codigo-validado';
+                extra.textContent = codigo;
+                resultado.appendChild(extra);
+            }
+            if (nombre || cedula) {
+                const datos = document.createElement('div');
+                datos.className = 'datos-validados';
+                if (nombre) {
+                    const lineaNombre = document.createElement('div');
+                    lineaNombre.innerHTML = '<span class="dato-label">Comprador</span><span class="dato-valor" id="datoNombre">' + nombre + '</span>';
+                    datos.appendChild(lineaNombre);
+                }
+                if (cedula) {
+                    const lineaCedula = document.createElement('div');
+                    lineaCedula.innerHTML = '<span class="dato-label">Cédula</span><span class="dato-valor" id="datoCedula">' + cedula + '</span>';
+                    datos.appendChild(lineaCedula);
+                }
+                resultado.appendChild(datos);
+            }
+        } else {
+            mensajeSpan.textContent = mensaje;
+        }
+
+        if (scannerActivo && html5QrCode) {
+            html5QrCode.clear().then(() => { scannerActivo = false; }).catch(() => {});
+        }
+
+        resultado.onclick = () => {
+            if (estado !== 'pendiente') {
+                resultado.className = 'estado-pendiente';
+                iconoSpan.textContent = '📱';
+                mensajeSpan.textContent = 'Apunta la cámara al código QR de la entrada.';
+                const extra = resultado.querySelector('.codigo-validado');
+                if (extra) extra.remove();
+                const datos = resultado.querySelector('.datos-validados');
+                if (datos) datos.remove();
+                resultado.onclick = null;
+                iniciarEscaneo();
+            }
+        };
+    }
+
+    async function iniciarEscaneo() {
+        try {
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+            const camaras = await Html5Qrcode.getCameras();
+            const camaraTrasera = camaras.find(c => /rear|back|environment/i.test(c.label)) || camaras[camaras.length - 1];
+            await html5QrCode.start(
+                camaraTrasera ? camaraTrasera.id : { facingMode: "environment" },
+                { width: 400, height: 300 },
+                (codigoDecodificado) => {
+                    if (scannerActivo) {
+                        scannerActivo = false;
+                        validarCodigo(codigoDecodificado.trim());
+                    }
+                },
+                () => {}
+            );
+            scannerActivo = true;
+            document.getElementById('cameraError').classList.remove('show');
+        } catch (err) {
+            scannerActivo = false;
+            document.getElementById('cameraError').classList.add('show');
+            console.error('Error de cámara:', err);
+        }
+    }
+
+    async function validarCodigo(codigo) {
+        try {
+            const res = await fetch('/api/validar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: codigo })
+            });
+            const data = await res.json();
+            if (res.status === 401) { location.href = '/login'; return; }
+            if (data.ok && data.estado === 'valido') {
+                mostrarResultado('exito', null, data.codigo, data.nombre, data.cedula);
+            } else {
+                mostrarResultado('error', data.error || 'Código inválido');
+            }
+        } catch (err) {
+            mostrarResultado('error', 'Error de conexión');
+        }
+    }
+
+    document.getElementById('btnValidarManual').addEventListener('click', () => {
+        const input = document.getElementById('codigoManual');
+        const codigo = input.value.trim().toUpperCase();
+        if (codigo.length >= 3) {
+            validarCodigo(codigo);
+        } else {
+            mostrarResultado('error', 'Ingresá un código válido');
+        }
+        input.value = '';
+    });
+
+    document.getElementById('codigoManual').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') document.getElementById('btnValidarManual').click();
+    });
+
+    iniciarEscaneo();
+</script>
+{% endblock %}
