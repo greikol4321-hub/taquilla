@@ -222,6 +222,33 @@
         border-color: var(--lima);
         background: var(--lima-suave);
     }
+
+    @media (min-width: 641px) {
+        .tabla-wrap { overflow-x: auto; }
+        .tabla { min-width: 560px; }
+        .comprador-nombre { max-width: 220px; }
+    }
+
+    @media (max-width: 640px) {
+        .tabla thead { display: none; }
+        .tabla, .tabla tbody { display: block; }
+        .tabla tr {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 4px 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .tabla td { padding: 0; border: none; }
+        .codigo-cell { font-size: 0.92rem; }
+        .tabla td:nth-child(3) { justify-self: end; }
+        .comprador-cell { grid-column: 1 / -1; margin-top: 2px; }
+        .comprador-nombre { max-width: none; font-size: 0.85rem; }
+        .fecha-cell { grid-column: 1; align-self: end; margin-top: 2px; }
+        .tabla td:last-child { grid-column: 2; grid-row: 3; justify-self: end; }
+        .tabla .vacio { display: block; text-align: center; padding: 28px; }
+    }
 </style>
 {% endblock %}
 {% block scripts %}
@@ -250,7 +277,7 @@
             renderTabla();
         } catch (err) {
             document.getElementById('tablaBody').innerHTML =
-                '<tr><td colspan="4" class="vacio">Error al cargar</td></tr>';
+                '<tr><td colspan="5" class="vacio">Error al cargar</td></tr>';
         }
     }
 
