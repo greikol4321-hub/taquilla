@@ -4,10 +4,11 @@
 <div class="portero-wrap">
     <div class="scanner-container">
         <div class="scanner-frame"></div>
+        <video id="videoCamara" playsinline autoplay muted></video>
         <div id="reader"></div>
         <div class="camara-opciones" id="camaraOpciones">
             <button class="btn-camara" id="btnFoto">📸 ABRIR CÁMARA</button>
-            <button class="btn-camara-live" id="btnCamara">🎥 Usar cámara en vivo</button>
+            <button class="btn-camara-live" id="btnCamara">🎥 Cámara en vivo</button>
         </div>
         <input type="file" id="inputFoto" accept="image/*" capture="environment" hidden>
     </div>
@@ -82,6 +83,14 @@
     }
 
     #reader { width: 100% !important; min-height: 260px; }
+
+    #videoCamara {
+        width: 100%;
+        min-height: 260px;
+        object-fit: cover;
+        display: none;
+        background: #050508;
+    }
 
     .btn-camara {
         width: 100%;
@@ -291,6 +300,21 @@
 <script>
     let html5QrCode = null;
     let scannerActivo = false;
+    let streamVideo = null;
+    let detenerDeteccion = null;
+    let modoHtml5 = false;
+
+    function detenerCamara() {
+        scannerActivo = false;
+        if (detenerDeteccion) { detenerDeteccion(); detenerDeteccion = null; }
+        if (streamVideo) { streamVideo.getTracks().forEach(t => t.stop()); streamVideo = null; }
+        const video = document.getElementById('videoCamara');
+        video.srcObject = null;
+        video.style.display = 'none';
+        if (modoHtml5 && html5QrCode) html5QrCode.clear().catch(() => {});
+        modoHtml5 = false;
+        document.getElementById('camaraOpciones').style.display = 'flex';
+    }
 
     function mostrarResultado(estado, mensaje, codigo, nombre, cedula) {
         const resultado = document.getElementById('resultado');
@@ -328,10 +352,7 @@
         }
 
         if (scannerActivo && html5QrCode) {
-            html5QrCode.clear().then(() => {
-                scannerActivo = false;
-                document.getElementById('camaraOpciones').style.display = 'flex';
-            }).catch(() => {});
+            detenerCamara();
         }
 
         resultado.onclick = () => {
@@ -372,26 +393,55 @@
 
     async function iniciarEscaneo() {
         try {
-            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-            await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(stream => stream.getTracks().forEach(t => t.stop()));
-            await html5QrCode.start(
-                { facingMode: "environment" },
-                { width: 400, height: 300 },
-                (codigoDecodificado) => {
-                    if (scannerActivo) {
-                        scannerActivo = false;
-                        validarCodigo(codigoDecodificado.trim());
-                    }
-                },
-                () => {}
-            );
-            scannerActivo = true;
             document.getElementById('camaraOpciones').style.display = 'none';
             document.getElementById('cameraError').classList.remove('show');
+
+            streamVideo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+
+            if ('BarcodeDetector' in window) {
+                const video = document.getElementById('videoCamara');
+                video.srcObject = streamVideo;
+                await video.play();
+                video.style.display = 'block';
+
+                const detector = new BarcodeDetector({ formats: ['qr_code'] });
+                let parado = false;
+                detenerDeteccion = () => { parado = true; };
+                scannerActivo = true;
+
+                (async function bucle() {
+                    while (!parado) {
+                        try {
+                            const codigos = await detector.detect(video);
+                            if (codigos.length > 0) {
+                                scannerActivo = false;
+                                detenerCamara();
+                                validarCodigo(codigos[0].rawValue.trim());
+                                return;
+                            }
+                        } catch (e) {}
+                        await new Promise(r => setTimeout(r, 250));
+                    }
+                })();
+            } else {
+                modoHtml5 = true;
+                if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+                await html5QrCode.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    (codigoDecodificado) => {
+                        if (scannerActivo) {
+                            scannerActivo = false;
+                            detenerCamara();
+                            validarCodigo(codigoDecodificado.trim());
+                        }
+                    },
+                    () => {}
+                );
+                scannerActivo = true;
+            }
         } catch (err) {
-            scannerActivo = false;
-            document.getElementById('camaraOpciones').style.display = 'flex';
+            detenerCamara();
             document.getElementById('cameraError').classList.add('show');
             console.error('Error de cámara:', err);
         }
