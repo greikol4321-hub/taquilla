@@ -482,7 +482,7 @@
         ctx.stroke();
         ctx.setLineDash([]);
 
-        const qrEl = qrcodeInstance ? qrcodeInstance._el : null;
+        const qrEl = document.querySelector('#qrcode img') || document.querySelector('#qrcode canvas');
         if (qrEl) {
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(140, 180, 360, 360);
