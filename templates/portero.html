@@ -239,6 +239,11 @@
 
     .manual-input-group button:hover { background: var(--lima); color: var(--negro); }
 
+    @media (max-width: 480px) {
+        .manual-input-group { flex-direction: column; }
+        .manual-input-group button { width: 100%; }
+    }
+
     .camera-error {
         text-align: center;
         padding: 12px;
