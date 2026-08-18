@@ -6,6 +6,7 @@
         <div class="scanner-frame"></div>
         <video id="videoCamara" playsinline autoplay muted></video>
         <div id="reader"></div>
+        <button class="btn-detener" id="btnDetenerCamara">⏹ DETENER</button>
         <div class="camara-opciones" id="camaraOpciones">
             <button class="btn-camara" id="btnCamara">🎥 Cámara en vivo</button>
         </div>
@@ -89,6 +90,27 @@
         display: none;
         background: #050508;
     }
+
+    .btn-detener {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 4;
+        display: none;
+        background: rgba(255, 77, 77, 0.15);
+        border: 1px solid rgba(255, 77, 77, 0.6);
+        color: var(--rojo);
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .btn-detener:hover { background: var(--rojo); color: var(--negro); }
 
     .btn-camara {
         width: 100%;
@@ -293,6 +315,7 @@
         const video = document.getElementById('videoCamara');
         video.srcObject = null;
         video.style.display = 'none';
+        document.getElementById('btnDetenerCamara').style.display = 'none';
         if (modoHtml5 && html5QrCode) html5QrCode.clear().catch(() => {});
         modoHtml5 = false;
         document.getElementById('camaraOpciones').style.display = 'flex';
@@ -357,6 +380,7 @@
             document.getElementById('cameraError').classList.remove('show');
 
             streamVideo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            document.getElementById('btnDetenerCamara').style.display = 'block';
 
             if ('BarcodeDetector' in window) {
                 const video = document.getElementById('videoCamara');
@@ -442,5 +466,6 @@
     });
 
     document.getElementById('btnCamara').addEventListener('click', iniciarEscaneo);
+    document.getElementById('btnDetenerCamara').addEventListener('click', detenerCamara);
 </script>
 {% endblock %}
