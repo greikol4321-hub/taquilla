@@ -7,10 +7,8 @@
         <video id="videoCamara" playsinline autoplay muted></video>
         <div id="reader"></div>
         <div class="camara-opciones" id="camaraOpciones">
-            <button class="btn-camara" id="btnFoto">📸 ABRIR CÁMARA</button>
-            <button class="btn-camara-live" id="btnCamara">🎥 Cámara en vivo</button>
+            <button class="btn-camara" id="btnCamara">🎥 Cámara en vivo</button>
         </div>
-        <input type="file" id="inputFoto" accept="image/*" capture="environment" hidden>
     </div>
 
     <div class="camera-error" id="cameraError">
@@ -122,22 +120,6 @@
         z-index: 3;
         backdrop-filter: blur(4px);
     }
-
-    .btn-camara-live {
-        background: transparent;
-        border: 1px solid var(--linea);
-        color: var(--texto-suave);
-        padding: 11px 16px;
-        border-radius: 10px;
-        font-family: 'Space Mono', monospace;
-        font-size: 0.68rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        cursor: pointer;
-        transition: all 0.35s var(--cubic);
-    }
-
-    .btn-camara-live:hover { color: var(--lima); border-color: var(--lima); }
 
     #resultado {
         width: 100%;
@@ -368,28 +350,6 @@
             }
         };
     }
-
-    async function escanearFoto(file) {
-        const resultado = document.getElementById('resultado');
-        resultado.className = 'estado-pendiente';
-        resultado.querySelector('.icono').textContent = '⏳';
-        resultado.querySelector('.mensaje').textContent = 'Escaneando foto...';
-        try {
-            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-            const texto = await Html5Qrcode.scanFile(file, false);
-            validarCodigo(texto.trim());
-        } catch (err) {
-            mostrarResultado('error', 'No se encontró un QR en la foto');
-        }
-    }
-
-    document.getElementById('btnFoto').addEventListener('click', () => document.getElementById('inputFoto').click());
-
-    document.getElementById('inputFoto').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) escanearFoto(file);
-        e.target.value = '';
-    });
 
     async function iniciarEscaneo() {
         try {
