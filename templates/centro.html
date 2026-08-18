@@ -17,6 +17,21 @@
         </div>
     </div>
 
+    <div class="stats">
+        <div class="stat">
+            <span class="stat-num stat-money" id="statPrecio">—</span>
+            <span class="stat-label">Precio / entrada</span>
+        </div>
+        <div class="stat">
+            <span class="stat-num stat-money stat-accent" id="statRecaudado">—</span>
+            <span class="stat-label">Recaudado total</span>
+        </div>
+        <div class="stat">
+            <span class="stat-num stat-money stat-ok" id="statRecaudadoUsadas">—</span>
+            <span class="stat-label">Recaudado usadas</span>
+        </div>
+    </div>
+
     <div class="herramientas">
         <input type="text" id="busqueda" class="search-input" placeholder="BUSCAR CÓDIGO..." autocomplete="off">
         <button class="btn-secundario" id="btnExportar">⬇ CSV</button>
@@ -74,6 +89,7 @@
 
     .stat-ok { color: var(--lima); }
     .stat-accent { color: #8f7bff; }
+    .stat-money { font-size: 1.05rem; }
 
     .stat-label {
         font-family: 'Space Mono', monospace;
@@ -261,6 +277,10 @@
             document.getElementById('statTotal').textContent = data.total;
             document.getElementById('statUsadas').textContent = data.usadas;
             document.getElementById('statPendientes').textContent = data.pendientes;
+            const colones = n => '₡' + Number(n || 0).toLocaleString('es-CR');
+            document.getElementById('statPrecio').textContent = colones(data.precio);
+            document.getElementById('statRecaudado').textContent = colones(data.recaudado_total);
+            document.getElementById('statRecaudadoUsadas').textContent = colones(data.recaudado_usadas);
         } catch (err) {
             mostrarToast('Error al cargar estadísticas');
         }

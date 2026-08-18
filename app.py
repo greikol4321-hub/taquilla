@@ -44,6 +44,9 @@ ROLES = {
 # Nombre del evento (para headers y footer)
 NOMBRE_EVENTO = os.environ.get("NOMBRE_EVENTO", "Fiesta Anual 2026")
 
+# Precio de cada entrada en colones
+PRECIO_ENTRADA = int(os.environ.get("PRECIO_ENTRADA", "1000"))
+
 TABLA = "entradas"
 
 
@@ -220,9 +223,20 @@ def api_stats():
     try:
         total = supabase.table(TABLA).select("id", count="exact").execute().count
         usadas = supabase.table(TABLA).select("id", count="exact").eq("usado", True).execute().count
-        return jsonify({"total": total, "usadas": usadas, "pendientes": total - usadas})
+        pendientes = total - usadas
+        precio = PRECIO_ENTRADA
+        return jsonify({
+            "total": total, "usadas": usadas, "pendientes": pendientes,
+            "precio": precio,
+            "recaudado_total": total * precio,
+            "recaudado_usadas": usadas * precio,
+            "recaudado_pendientes": pendientes * precio,
+        })
     except Exception:
-        return jsonify({"total": 0, "usadas": 0, "pendientes": 0})
+        precio = PRECIO_ENTRADA
+        return jsonify({"total": 0, "usadas": 0, "pendientes": 0,
+                        "precio": precio, "recaudado_total": 0,
+                        "recaudado_usadas": 0, "recaudado_pendientes": 0})
 
 
 @app.route("/api/listar")
@@ -274,12 +288,26 @@ def api_exportar():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
+    total = len(resp.data)
+    usadas = sum(1 for r in resp.data if r["usado"])
+    pendientes = total - usadas
+    precio = PRECIO_ENTRADA
+
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["id", "codigo", "nombre", "cedula", "usado", "creado_en"])
+    writer.writerow(["RESUMEN"])
+    writer.writerow(["precio_entrada", precio])
+    writer.writerow(["total_generadas", total])
+    writer.writerow(["total_usadas", usadas])
+    writer.writerow(["total_pendientes", pendientes])
+    writer.writerow(["recaudado_total", total * precio])
+    writer.writerow(["recaudado_usadas", usadas * precio])
+    writer.writerow(["recaudado_pendientes", pendientes * precio])
+    writer.writerow([])
+    writer.writerow(["id", "codigo", "nombre", "cedula", "usado", "precio", "creado_en"])
     for row in resp.data:
         writer.writerow([row["id"], row["codigo"], row.get("nombre", ""),
-                         row.get("cedula", ""), row["usado"], row["creado_en"]])
+                         row.get("cedula", ""), row["usado"], precio, row["creado_en"]])
 
     response = Response(output.getvalue(), mimetype="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=entradas.csv"
