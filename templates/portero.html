@@ -5,16 +5,17 @@
     <div class="scanner-container">
         <div class="scanner-frame"></div>
         <div id="reader"></div>
+        <button class="btn-camara" id="btnCamara">📷 ACTIVAR CÁMARA</button>
     </div>
 
     <div class="camera-error" id="cameraError">
         <p>⚠️ No se pudo acceder a la cámara.</p>
-        <p class="camera-error-sub">Concedé permiso de cámara o usá el modo manual abajo.</p>
+        <p class="camera-error-sub">Tocá el candado 🔒 de la barra de direcciones y permití el acceso a la cámara, o usá el modo manual abajo.</p>
     </div>
 
     <div id="resultado" class="estado-pendiente">
         <div class="icono">📱</div>
-        <div class="mensaje">Apunta la cámara al código QR de la entrada.</div>
+        <div class="mensaje">Activá la cámara o ingresá el código manualmente.</div>
     </div>
 
     <div class="manual-container">
@@ -77,6 +78,29 @@
     }
 
     #reader { width: 100% !important; min-height: 260px; }
+
+    .btn-camara {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: rgba(5, 5, 8, 0.82);
+        color: var(--lima);
+        border: none;
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 0.9rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        cursor: pointer;
+        z-index: 3;
+        transition: background 0.35s var(--cubic);
+        backdrop-filter: blur(4px);
+    }
+
+    .btn-camara:hover { background: rgba(5, 5, 8, 0.6); }
 
     #resultado {
         width: 100%;
@@ -271,14 +295,17 @@
         }
 
         if (scannerActivo && html5QrCode) {
-            html5QrCode.clear().then(() => { scannerActivo = false; }).catch(() => {});
+            html5QrCode.clear().then(() => {
+                scannerActivo = false;
+                document.getElementById('btnCamara').style.display = 'flex';
+            }).catch(() => {});
         }
 
         resultado.onclick = () => {
             if (estado !== 'pendiente') {
                 resultado.className = 'estado-pendiente';
                 iconoSpan.textContent = '📱';
-                mensajeSpan.textContent = 'Apunta la cámara al código QR de la entrada.';
+                mensajeSpan.textContent = 'Activá la cámara o ingresá el código manualmente.';
                 const extra = resultado.querySelector('.codigo-validado');
                 if (extra) extra.remove();
                 const datos = resultado.querySelector('.datos-validados');
@@ -292,10 +319,10 @@
     async function iniciarEscaneo() {
         try {
             if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-            const camaras = await Html5Qrcode.getCameras();
-            const camaraTrasera = camaras.find(c => /rear|back|environment/i.test(c.label)) || camaras[camaras.length - 1];
+            await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(stream => stream.getTracks().forEach(t => t.stop()));
             await html5QrCode.start(
-                camaraTrasera ? camaraTrasera.id : { facingMode: "environment" },
+                { facingMode: "environment" },
                 { width: 400, height: 300 },
                 (codigoDecodificado) => {
                     if (scannerActivo) {
@@ -306,9 +333,11 @@
                 () => {}
             );
             scannerActivo = true;
+            document.getElementById('btnCamara').style.display = 'none';
             document.getElementById('cameraError').classList.remove('show');
         } catch (err) {
             scannerActivo = false;
+            document.getElementById('btnCamara').style.display = 'flex';
             document.getElementById('cameraError').classList.add('show');
             console.error('Error de cámara:', err);
         }
@@ -348,6 +377,6 @@
         if (e.key === 'Enter') document.getElementById('btnValidarManual').click();
     });
 
-    iniciarEscaneo();
+    document.getElementById('btnCamara').addEventListener('click', iniciarEscaneo);
 </script>
 {% endblock %}

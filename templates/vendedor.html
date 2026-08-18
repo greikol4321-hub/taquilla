@@ -49,7 +49,10 @@
         </div>
         <div class="btn-fila">
             <button class="btn-copy" id="btnCopy">
-                <span id="copyIcon">📋</span> Copiar
+                <span id="copyIcon">📋</span> Código
+            </button>
+            <button class="btn-copy" id="btnCopyImg">
+                <span id="copyImgIcon">🖼️</span> Imagen
             </button>
             <button class="btn-wa" id="btnWhatsApp">
                 <span id="waIcon">🟢</span> WhatsApp
@@ -529,6 +532,34 @@
         return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     }
 
+    async function copiarImagenTicket() {
+        const codigo = document.getElementById('codigoDisplay').textContent.trim();
+        if (!codigo || codigo.includes('-')) return;
+        const blob = await generarImagenTicket();
+        const icon = document.getElementById('copyImgIcon');
+        try {
+            if (!navigator.clipboard || !window.ClipboardItem) throw new Error('sin clipboard');
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            icon.textContent = '✓';
+            document.getElementById('btnCopyImg').classList.add('copied');
+            mostrarToast('Imagen copiada — pegala en WhatsApp');
+            setTimeout(() => {
+                icon.textContent = '🖼️';
+                document.getElementById('btnCopyImg').classList.remove('copied');
+            }, 2000);
+        } catch (e) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ticket-' + codigo + '.png';
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            mostrarToast('Imagen descargada');
+        }
+    }
+
+    document.getElementById('btnCopyImg').addEventListener('click', copiarImagenTicket);
+
     async function compartirWhatsApp() {
         const codigo = document.getElementById('codigoDisplay').textContent.trim();
         const nombre = document.getElementById('boletoNombre').textContent;
@@ -551,12 +582,14 @@
             }
         }
 
+        await copiarImagenTicket();
+
         const texto = encodeURIComponent(
             '🎫 ' + NOMBRE_EVENTO.toUpperCase() +
             '\nCódigo: ' + codigo +
             '\nComprador: ' + nombre +
             '\nCédula: ' + cedula +
-            '\n\nPresentá este código en la entrada.'
+            '\n\nPresentá el ticket (imagen) en la entrada.'
         );
         window.open('https://wa.me/?text=' + texto, '_blank');
     }

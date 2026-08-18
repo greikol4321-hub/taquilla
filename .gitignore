@@ -1,5 +1,6 @@
 .env
 admin_db.py
 __pycache__/
-.vercel/verify_prod.py
+.vercel/
+verify_prod.py
 entradas.db
