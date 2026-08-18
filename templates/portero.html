@@ -5,7 +5,11 @@
     <div class="scanner-container">
         <div class="scanner-frame"></div>
         <div id="reader"></div>
-        <button class="btn-camara" id="btnCamara">📷 ACTIVAR CÁMARA</button>
+        <div class="camara-opciones" id="camaraOpciones">
+            <button class="btn-camara" id="btnFoto">📸 ABRIR CÁMARA</button>
+            <button class="btn-camara-live" id="btnCamara">🎥 Usar cámara en vivo</button>
+        </div>
+        <input type="file" id="inputFoto" accept="image/*" capture="environment" hidden>
     </div>
 
     <div class="camera-error" id="cameraError">
@@ -80,27 +84,51 @@
     #reader { width: 100% !important; min-height: 260px; }
 
     .btn-camara {
+        width: 100%;
+        background: var(--lima);
+        color: var(--negro);
+        border: none;
+        padding: 16px;
+        border-radius: 12px;
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 0.9rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform 0.35s var(--cubic), background 0.35s var(--cubic);
+    }
+
+    .btn-camara:hover { transform: scale(1.02); background: #e4ff70; }
+
+    .camara-opciones {
         position: absolute;
         top: 0; left: 0; right: 0; bottom: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        background: rgba(5, 5, 8, 0.82);
-        color: var(--lima);
-        border: none;
-        font-family: 'Archivo Black', sans-serif;
-        font-size: 0.9rem;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        cursor: pointer;
+        gap: 10px;
+        padding: 24px;
+        background: rgba(5, 5, 8, 0.88);
         z-index: 3;
-        transition: background 0.35s var(--cubic);
         backdrop-filter: blur(4px);
     }
 
-    .btn-camara:hover { background: rgba(5, 5, 8, 0.6); }
+    .btn-camara-live {
+        background: transparent;
+        border: 1px solid var(--linea);
+        color: var(--texto-suave);
+        padding: 11px 16px;
+        border-radius: 10px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.68rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .btn-camara-live:hover { color: var(--lima); border-color: var(--lima); }
 
     #resultado {
         width: 100%;
@@ -302,7 +330,7 @@
         if (scannerActivo && html5QrCode) {
             html5QrCode.clear().then(() => {
                 scannerActivo = false;
-                document.getElementById('btnCamara').style.display = 'flex';
+                document.getElementById('camaraOpciones').style.display = 'flex';
             }).catch(() => {});
         }
 
@@ -316,10 +344,31 @@
                 const datos = resultado.querySelector('.datos-validados');
                 if (datos) datos.remove();
                 resultado.onclick = null;
-                iniciarEscaneo();
             }
         };
     }
+
+    async function escanearFoto(file) {
+        const resultado = document.getElementById('resultado');
+        resultado.className = 'estado-pendiente';
+        resultado.querySelector('.icono').textContent = '⏳';
+        resultado.querySelector('.mensaje').textContent = 'Escaneando foto...';
+        try {
+            if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+            const texto = await Html5Qrcode.scanFile(file, false);
+            validarCodigo(texto.trim());
+        } catch (err) {
+            mostrarResultado('error', 'No se encontró un QR en la foto');
+        }
+    }
+
+    document.getElementById('btnFoto').addEventListener('click', () => document.getElementById('inputFoto').click());
+
+    document.getElementById('inputFoto').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) escanearFoto(file);
+        e.target.value = '';
+    });
 
     async function iniciarEscaneo() {
         try {
@@ -338,11 +387,11 @@
                 () => {}
             );
             scannerActivo = true;
-            document.getElementById('btnCamara').style.display = 'none';
+            document.getElementById('camaraOpciones').style.display = 'none';
             document.getElementById('cameraError').classList.remove('show');
         } catch (err) {
             scannerActivo = false;
-            document.getElementById('btnCamara').style.display = 'flex';
+            document.getElementById('camaraOpciones').style.display = 'flex';
             document.getElementById('cameraError').classList.add('show');
             console.error('Error de cámara:', err);
         }
