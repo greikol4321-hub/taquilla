@@ -59,17 +59,35 @@
         z-index: 2;
     }
 
-    .scanner-frame::before, .scanner-frame::after {
+    .scanner-frame::before {
         content: '';
         position: absolute;
-        width: 30px;
-        height: 30px;
-        border: 3px solid var(--lima);
-        box-sizing: border-box;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60%;
+        height: 64%;
+        border: 2px solid rgba(217, 255, 61, 0.35);
+        border-radius: 12px;
+        box-shadow: 0 0 26px rgba(217, 255, 61, 0.12), inset 0 0 26px rgba(217, 255, 61, 0.08);
     }
 
-    .scanner-frame::before { top: 14px; left: 14px; border-bottom: none; border-right: none; }
-    .scanner-frame::after { top: 14px; right: 14px; border-bottom: none; border-left: none; }
+    .scanner-frame::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 52%;
+        height: 3px;
+        background: var(--lima);
+        border-radius: 2px;
+        box-shadow: 0 0 14px var(--lima);
+        animation: scanline 2.4s ease-in-out infinite;
+    }
+
+    @keyframes scanline {
+        0%, 100% { top: 20%; }
+        50% { top: 74%; }
+    }
 
     .scanner-container::after {
         content: '';
@@ -81,11 +99,11 @@
         opacity: 0.55;
     }
 
-    #reader { width: 100% !important; min-height: 260px; }
+    #reader { width: 100% !important; min-height: 200px; }
 
     #videoCamara {
         width: 100%;
-        min-height: 260px;
+        height: 200px;
         object-fit: cover;
         display: none;
         background: #050508;
