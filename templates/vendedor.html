@@ -54,6 +54,9 @@
             <button class="btn-copy" id="btnCopyImg">
                 <span id="copyImgIcon">🖼️</span> Imagen
             </button>
+            <button class="btn-wa" id="btnWhatsApp">
+                <span id="waIcon">🟢</span> WhatsApp
+            </button>
         </div>
     </div>
 </div>
@@ -334,12 +337,35 @@
         gap: 8px;
         margin-top: 12px;
     }
+
+    .btn-wa {
+        display: none;
+        flex: 1;
+        background: rgba(37, 211, 102, 0.12);
+        border: 1px solid rgba(37, 211, 102, 0.45);
+        color: #25d366;
+        padding: 13px;
+        border-radius: 10px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.76rem;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+        transition: all 0.35s var(--cubic);
+    }
+
+    .btn-wa:hover { background: #25d366; color: var(--negro); border-color: #25d366; }
+
+    @media (max-width: 640px) {
+        .btn-wa { display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-copy { flex: 1; }
+    }
 </style>
 {% endblock %}
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
     let qrcodeInstance = null;
+    let qrDataUrl = null;
     let contador = 0;
 
     function actualizarContador() {
@@ -411,6 +437,11 @@
                     colorLight: '#ffffff',
                     correctLevel: QRCode.CorrectLevel.M
                 });
+                qrDataUrl = null;
+                setTimeout(() => {
+                    const img = document.querySelector('#qrcode img');
+                    if (img) qrDataUrl = img.src;
+                }, 200);
 
                 document.getElementById('qrCard').style.display = 'block';
                 actualizarContador();
@@ -429,7 +460,7 @@
 
     const NOMBRE_EVENTO = "{{ nombre_evento }}";
 
-    function generarImagenTicket() {
+    async function generarImagenTicket() {
         const codigo = document.getElementById('codigoDisplay').textContent.trim();
         const nombre = document.getElementById('boletoNombre').textContent;
         const cedula = document.getElementById('boletoCedula').textContent;
@@ -463,11 +494,13 @@
         ctx.stroke();
         ctx.setLineDash([]);
 
-        const qrEl = document.querySelector('#qrcode img') || document.querySelector('#qrcode canvas');
-        if (qrEl) {
+        if (qrDataUrl) {
+            const qrImg = new Image();
+            qrImg.src = qrDataUrl;
+            await new Promise((resolve, reject) => { qrImg.onload = resolve; qrImg.onerror = reject; });
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(140, 180, 360, 360);
-            ctx.drawImage(qrEl, 150, 190, 340, 340);
+            ctx.drawImage(qrImg, 150, 190, 340, 340);
         }
 
         ctx.font = '20px "Space Mono", monospace';
@@ -541,5 +574,40 @@
     }
 
     document.getElementById('btnCopyImg').addEventListener('click', copiarImagenTicket);
+
+    async function compartirWhatsApp() {
+        const codigo = document.getElementById('codigoDisplay').textContent.trim();
+        const nombre = document.getElementById('boletoNombre').textContent;
+        const cedula = document.getElementById('boletoCedula').textContent;
+        if (!codigo || codigo.includes('-')) return;
+
+        const blob = await generarImagenTicket();
+        const file = new File([blob], 'ticket.png', { type: 'image/png' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: NOMBRE_EVENTO,
+                    text: codigo + ' · ' + nombre + ' · CI ' + cedula
+                });
+                return;
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+            }
+        }
+
+        await copiarImagenTicket();
+        const texto = encodeURIComponent(
+            '🎫 ' + NOMBRE_EVENTO.toUpperCase() +
+            '\nCódigo: ' + codigo +
+            '\nComprador: ' + nombre +
+            '\nCédula: ' + cedula +
+            '\n\nPresentá el ticket (imagen) en la entrada.'
+        );
+        window.open('https://wa.me/?text=' + texto, '_blank');
+    }
+
+    document.getElementById('btnWhatsApp').addEventListener('click', compartirWhatsApp);
 </script>
 {% endblock %}
