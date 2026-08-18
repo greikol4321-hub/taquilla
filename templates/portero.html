@@ -334,6 +334,7 @@
         video.srcObject = null;
         video.style.display = 'none';
         document.getElementById('btnDetenerCamara').style.display = 'none';
+        document.getElementById('reader').style.display = 'block';
         if (modoHtml5 && html5QrCode) html5QrCode.clear().catch(() => {});
         modoHtml5 = false;
         document.getElementById('camaraOpciones').style.display = 'flex';
@@ -405,6 +406,7 @@
                 video.srcObject = streamVideo;
                 await video.play();
                 video.style.display = 'block';
+                document.getElementById('reader').style.display = 'none';
 
                 const detector = new BarcodeDetector({ formats: ['qr_code'] });
                 let parado = false;
