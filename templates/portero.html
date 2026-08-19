@@ -425,7 +425,7 @@
                             if (codigos.length > 0) {
                                 scannerActivo = false;
                                 detenerCamara();
-                                validarCodigo(codigos[0].rawValue.trim());
+                                validarCodigo(codigos[0].rawValue.trim(), 'camara');
                                 return;
                             }
                         } catch (e) {}
@@ -442,7 +442,7 @@
                         if (scannerActivo) {
                             scannerActivo = false;
                             detenerCamara();
-                            validarCodigo(codigoDecodificado.trim());
+                            validarCodigo(codigoDecodificado.trim(), 'camara');
                         }
                     },
                     () => {}
@@ -456,12 +456,12 @@
         }
     }
 
-    async function validarCodigo(codigo) {
+    async function validarCodigo(codigo, origen) {
         try {
             const res = await fetch('/api/validar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: codigo })
+                body: JSON.stringify({ code: codigo, origen: origen })
             });
             const data = await res.json();
             if (res.status === 401) { location.href = '/login'; return; }
@@ -479,7 +479,7 @@
         const input = document.getElementById('codigoManual');
         const codigo = input.value.trim().toUpperCase();
         if (codigo.length >= 3) {
-            validarCodigo(codigo);
+            validarCodigo(codigo, 'manual');
         } else {
             mostrarResultado('error', 'Ingresá un código válido');
         }

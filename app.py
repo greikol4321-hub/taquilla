@@ -236,6 +236,7 @@ def api_validar():
         return jsonify({"ok": False, "error": "Codigo requerido"}), 400
 
     codigo = data["code"].strip().upper()
+    origen = "cámara" if data.get("origen") == "camara" else "manual"
 
     try:
         resp = supabase.table(TABLA).select("usado,nombre,cedula").eq("codigo", codigo).execute()
@@ -243,17 +244,17 @@ def api_validar():
         return jsonify({"ok": False, "error": f"Error de base de datos: {e}"}), 500
 
     if not resp.data:
-        registrar_log("escaneo", f"{codigo} — código no encontrado")
+        registrar_log("escaneo", f"{codigo} — {origen} | código no encontrado")
         return jsonify({"ok": False, "estado": "inexistente",
                         "error": "Codigo no encontrado"}), 404
 
     if resp.data[0]["usado"]:
-        registrar_log("escaneo", f"{codigo} — ya usado ({resp.data[0].get('nombre', '')})")
+        registrar_log("escaneo", f"{codigo} — {origen} | ya usado ({resp.data[0].get('nombre', '')})")
         return jsonify({"ok": False, "estado": "usado",
                         "error": "Codigo ya fue utilizado"}), 409
 
     supabase.table(TABLA).update({"usado": True}).eq("codigo", codigo).execute()
-    registrar_log("escaneo", f"{codigo} — válido, {resp.data[0].get('nombre', '')}")
+    registrar_log("escaneo", f"{codigo} — {origen} | válido, {resp.data[0].get('nombre', '')}")
 
     return jsonify({"ok": True, "estado": "valido", "codigo": codigo,
                     "nombre": resp.data[0].get("nombre", ""),

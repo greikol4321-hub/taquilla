@@ -295,4 +295,18 @@ client.post('/api/logout')
 r = client.post('/api/login', json={'usuario': 'admin', 'password': 'admin2026'})
 assert r.status_code == 200, "Admin sigue logueandose tras borrar/editar"
 
+# Origen del escaneo en logs: camara explicito y manual por defecto
+r = client.post('/api/generar', json={'nombre': 'Origen Test', 'cedula': '11111'})
+codigo_origen = r.get_json()['codigo']
+r = client.post('/api/validar', json={'code': codigo_origen, 'origen': 'camara'})
+assert r.status_code == 200 and r.get_json()['estado'] == 'valido', \
+    "Admin puede validar con origen camara"
+
+r = client.get('/api/logs')
+logs = r.get_json()['logs']
+assert any(l['accion'] == 'escaneo' and 'cámara' in l['detalle'] for l in logs), \
+    "Debe haber un log de escaneo por cámara"
+assert any(l['accion'] == 'escaneo' and 'manual' in l['detalle'] for l in logs), \
+    "Debe haber un log de escaneo manual (default sin origen)"
+
 print("TODOS LOS TESTS OK")
