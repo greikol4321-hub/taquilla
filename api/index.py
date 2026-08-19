@@ -43,7 +43,7 @@ ROLES = {
 }
 
 # Nombre del evento (para headers y footer)
-NOMBRE_EVENTO = os.environ.get("NOMBRE_EVENTO", "Fiesta Anual 2026")
+NOMBRE_EVENTO = os.environ.get("NOMBRE_EVENTO", "Baile CTPM 2026")
 
 # Precio de cada entrada en colones
 PRECIO_ENTRADA = int(os.environ.get("PRECIO_ENTRADA", "1000"))
