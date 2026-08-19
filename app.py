@@ -455,6 +455,10 @@ def api_users_editar(user_id):
     if not cambios:
         return jsonify({"ok": False, "error": "Nada que editar"}), 400
 
+    prev = supabase.table(TABLA_USERS).select("usuario,nombre,rol").eq("id", user_id).execute()
+    if not prev.data:
+        return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
+
     resp = supabase.table(TABLA_USERS).update(cambios).eq("id", user_id).execute()
     if not resp.data:
         return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
@@ -462,7 +466,17 @@ def api_users_editar(user_id):
     if "usuario" in cambios and session.get("usuario") and resp.data[0]["usuario"] == session.get("usuario"):
         session["usuario"] = cambios["usuario"]
 
-    registrar_log("user_editar", f"id {user_id}: {list(cambios.keys())}")
+    antes = prev.data[0]
+    textos = []
+    if "usuario" in cambios:
+        textos.append(f"usuario {antes['usuario']} → {cambios['usuario']}")
+    if "nombre" in cambios:
+        textos.append(f"nombre {antes['nombre'] or '—'} → {cambios['nombre'] or '—'}")
+    if "rol" in cambios:
+        textos.append(f"rol {antes['rol']} → {cambios['rol']}")
+    if "password_hash" in cambios:
+        textos.append("contraseña actualizada")
+    registrar_log("user_editar", f"id {user_id} · {', '.join(textos)}")
     return jsonify({"ok": True})
 
 
