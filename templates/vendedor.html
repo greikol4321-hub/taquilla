@@ -439,9 +439,7 @@
                     correctLevel: QRCode.CorrectLevel.M
                 });
                 ticketBlob = null;
-                setTimeout(async () => {
-                    try { ticketBlob = await generarImagenTicket(); } catch (e) {}
-                }, 300);
+                try { ticketBlob = await generarImagenTicket(); } catch (e) {}
 
                 document.getElementById('qrCard').style.display = 'block';
                 actualizarContador();
@@ -570,7 +568,12 @@
             a.download = 'ticket-' + codigo + '.png';
             a.click();
             setTimeout(() => URL.revokeObjectURL(url), 5000);
-            mostrarToast('Imagen descargada');
+            if (navigator.userAgentData?.mobile || /Mobi|Android/i.test(navigator.userAgent)) {
+                setTimeout(() => window.open('https://wa.me/', '_blank'), 400);
+                mostrarToast('Imagen descargada — abrí WhatsApp y adjuntala');
+            } else {
+                mostrarToast('Imagen descargada');
+            }
         }
     }
 
@@ -580,8 +583,12 @@
         const codigo = document.getElementById('codigoDisplay').textContent.trim();
         if (!codigo || codigo.includes('-')) return;
 
-        const blob = ticketBlob || await generarImagenTicket();
-        const file = new File([blob], 'ticket.png', { type: 'image/png' });
+        if (!ticketBlob) {
+            mostrarToast('Generá la entrada de nuevo');
+            return;
+        }
+
+        const file = new File([ticketBlob], 'ticket.png', { type: 'image/png' });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
@@ -593,7 +600,6 @@
         }
 
         await copiarImagenTicket();
-        mostrarToast('Imagen copiada — pegala en WhatsApp');
     }
 
     document.getElementById('btnWhatsApp').addEventListener('click', compartirWhatsApp);
