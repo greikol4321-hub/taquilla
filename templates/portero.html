@@ -6,19 +6,19 @@
         <div class="scanner-frame"></div>
         <video id="videoCamara" playsinline autoplay muted></video>
         <div id="reader"></div>
-        <button class="btn-detener" id="btnDetenerCamara">⏹ DETENER</button>
+        <button class="btn-detener" id="btnDetenerCamara"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect width="18" height="18" x="3" y="3" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg> DETENER</button>
         <div class="camara-opciones" id="camaraOpciones">
-            <button class="btn-camara" id="btnCamara">🎥 Cámara en vivo</button>
+            <button class="btn-camara" id="btnCamara"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg> Cámara en vivo</button>
         </div>
     </div>
 
     <div class="camera-error" id="cameraError">
-        <p>⚠️ No se pudo acceder a la cámara.</p>
-        <p class="camera-error-sub">Tocá el candado 🔒 de la barra de direcciones y permití el acceso a la cámara, o usá el modo manual abajo.</p>
+        <p><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> No se pudo acceder a la cámara.</p>
+        <p class="camera-error-sub">Tocá el candado <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> de la barra de direcciones y permití el acceso a la cámara, o usá el modo manual abajo.</p>
     </div>
 
     <div id="resultado" class="estado-pendiente">
-        <div class="icono">📱</div>
+        <div class="icono"><svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></div>
         <div class="mensaje">Activá la cámara o ingresá el código manualmente.</div>
     </div>
 
@@ -327,6 +327,10 @@
     let detenerDeteccion = null;
     let modoHtml5 = false;
 
+    const SVG_CHECK = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
+    const SVG_ALERT = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+    const SVG_PHONE = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>';
+
     function detenerCamara() {
         scannerActivo = false;
         if (detenerDeteccion) { detenerDeteccion(); detenerDeteccion = null; }
@@ -347,7 +351,7 @@
         const mensajeSpan = resultado.querySelector('.mensaje');
 
         resultado.className = 'estado-' + estado;
-        iconoSpan.textContent = estado === 'exito' ? '✅' : '⚠️';
+        iconoSpan.innerHTML = estado === 'exito' ? SVG_CHECK : SVG_ALERT;
 
         if (estado === 'exito') {
             mensajeSpan.textContent = 'ACCESO PERMITIDO';
@@ -383,7 +387,7 @@
         resultado.onclick = () => {
             if (estado !== 'pendiente') {
                 resultado.className = 'estado-pendiente';
-                iconoSpan.textContent = '📱';
+                iconoSpan.innerHTML = SVG_PHONE;
                 mensajeSpan.textContent = 'Activá la cámara o ingresá el código manualmente.';
                 const extra = resultado.querySelector('.codigo-validado');
                 if (extra) extra.remove();

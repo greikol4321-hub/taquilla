@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block titulo %}{{ nombre_evento }}{% endblock %}</title>
     <meta name="theme-color" content="#0b0b0f">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎫</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d9ff3d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z'/%3E%3Cpath d='M13 5v2'/%3E%3Cpath d='M13 17v2'/%3E%3Cpath d='M13 11v2'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Karla:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -276,7 +276,7 @@
     {% if request.path != '/login' %}
     <header class="header">
         <div class="brand">
-            <div class="sello">🎫</div>
+            <div class="sello"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg></div>
             <div>
                 <div class="titulo">{{ nombre_evento }}</div>
                 <div class="subtitulo">Sistema de Entradas</div>
@@ -297,11 +297,11 @@
     {% if request.path != '/login' %}
     <nav class="tabbar">
         {% if rol == 'vendedor' %}
-        <a href="/vendedor" class="{{ 'activo' if request.path in ['/vendedor', '/'] else '' }}"><span class="ico">🎟️</span>Vendedor</a>
+        <a href="/vendedor" class="{{ 'activo' if request.path in ['/vendedor', '/'] else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg></span>Vendedor</a>
         {% else %}
-        <a href="/portero" class="{{ 'activo' if request.path == '/portero' else '' }}"><span class="ico">🔎</span>Portero</a>
+        <a href="/portero" class="{{ 'activo' if request.path == '/portero' else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></span>Portero</a>
         {% endif %}
-        <a href="/centro" class="{{ 'activo' if request.path == '/centro' else '' }}"><span class="ico">📊</span>Centro</a>
+        <a href="/centro" class="{{ 'activo' if request.path == '/centro' else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h8"/><path d="M7 11h12"/><path d="M7 6h3"/></svg></span>Centro</a>
     </nav>
     <div class="toast" id="toast"></div>
     <script>
