@@ -88,6 +88,17 @@ assert datos['nombre'] == 'Juan Perez' and datos['cedula'] == '12345678', \
     "Generar debe devolver nombre y cedula"
 assert datos['id'] >= 1, "Generar debe devolver el id de la entrada"
 
+# Duplicados: mismo nombre no se puede vender de nuevo
+r = client.post('/api/generar', json={'nombre': 'juan perez', 'cedula': '99999999'})
+assert r.status_code == 409, f"Nombre duplicado debe ser 409, fue {r.status_code}"
+assert 'nombre' in r.get_json()['error'], "Error debe mencionar el nombre"
+
+# Duplicados: misma cedula no se puede vender de nuevo
+r = client.post('/api/generar', json={'nombre': 'Otro Nombre', 'cedula': '12345678'})
+assert r.status_code == 409, f"Cedula duplicada debe ser 409, fue {r.status_code}"
+assert 'cédula' in r.get_json()['error'] or 'cedula' in r.get_json()['error'], \
+    "Error debe mencionar la cedula"
+
 # ------------------------------------------------------------------
 # Validar
 # ------------------------------------------------------------------

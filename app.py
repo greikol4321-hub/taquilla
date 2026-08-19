@@ -75,6 +75,20 @@ def generar_codigo():
     return uuid.uuid4().hex[:8].upper()
 
 
+def entrada_duplicada(nombre, cedula):
+    """Devuelve 'nombre', 'cedula' o None si ya existe una entrada con esos datos."""
+    def escapar(v):
+        return v.replace('%', r'\%').replace('_', r'\_')
+
+    r1 = supabase.table(TABLA).select("id").ilike("nombre", escapar(nombre)).limit(1).execute()
+    if r1.data:
+        return "nombre"
+    r2 = supabase.table(TABLA).select("id").ilike("cedula", escapar(cedula)).limit(1).execute()
+    if r2.data:
+        return "cedula"
+    return None
+
+
 # -----------------------------------------------------------
 # Rutas de interfaz (protegidas con login)
 # -----------------------------------------------------------
@@ -157,6 +171,12 @@ def api_generar():
 
     if not nombre or not cedula:
         return jsonify({"ok": False, "error": "Nombre y cedula son requeridos"}), 400
+
+    dup = entrada_duplicada(nombre, cedula)
+    if dup:
+        campo = "nombre" if dup == "nombre" else "cedula"
+        return jsonify({"ok": False,
+                        "error": f"Ya existe una entrada con ese {campo}"}), 409
 
     for _ in range(5):
         codigo = generar_codigo()
