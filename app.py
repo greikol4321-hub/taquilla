@@ -435,6 +435,14 @@ def api_users_crear():
 def api_users_editar(user_id):
     data = request.get_json(silent=True) or {}
     cambios = {}
+    if "usuario" in data:
+        nuevo_usuario = (data.get("usuario") or "").strip().lower()
+        if not nuevo_usuario:
+            return jsonify({"ok": False, "error": "El usuario no puede estar vacío"}), 400
+        existe = supabase.table(TABLA_USERS).select("id").eq("usuario", nuevo_usuario).execute()
+        if existe.data and existe.data[0]["id"] != user_id:
+            return jsonify({"ok": False, "error": "Ese usuario ya existe"}), 409
+        cambios["usuario"] = nuevo_usuario
     if "nombre" in data:
         cambios["nombre"] = (data.get("nombre") or "").strip()[:60]
     if "rol" in data:
@@ -450,6 +458,9 @@ def api_users_editar(user_id):
     resp = supabase.table(TABLA_USERS).update(cambios).eq("id", user_id).execute()
     if not resp.data:
         return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
+
+    if "usuario" in cambios and session.get("usuario") and resp.data[0]["usuario"] == session.get("usuario"):
+        session["usuario"] = cambios["usuario"]
 
     registrar_log("user_editar", f"id {user_id}: {list(cambios.keys())}")
     return jsonify({"ok": True})

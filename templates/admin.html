@@ -391,6 +391,7 @@
     document.getElementById('formEdit').addEventListener('submit', async e => {
         e.preventDefault();
         const body = {
+            usuario: document.getElementById('eUsuario').value,
             nombre: document.getElementById('eNombre').value,
             rol: document.getElementById('eRol').value
         };

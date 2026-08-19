@@ -282,6 +282,14 @@ nuevo = _admin.table('users').select('id').eq('usuario', 'testtemp').execute().d
 r = client.put(f'/api/users/{nuevo}', json={'rol': 'portero', 'password': 'nueva123'})
 assert r.status_code == 200 and r.get_json()['ok'], "Editar usuario debe funcionar"
 
+r = client.put(f'/api/users/{nuevo}', json={'usuario': 'testtemp2', 'nombre': 'Temp Dos'})
+assert r.status_code == 200 and r.get_json()['ok'], "Editar usuario y nombre debe funcionar"
+nuevo_usuario = _admin.table('users').select('usuario').eq('id', nuevo).execute().data[0]
+assert nuevo_usuario['usuario'] == 'testtemp2', "El usuario debe cambiar en la base"
+
+r = client.put(f'/api/users/{nuevo}', json={'usuario': 'admin'})
+assert r.status_code == 409, "Usuario duplicado debe ser 409"
+
 r = client.delete(f'/api/users/{nuevo}')
 assert r.status_code == 200 and r.get_json()['ok'], "Borrar usuario debe funcionar"
 
