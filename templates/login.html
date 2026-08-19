@@ -8,13 +8,9 @@
         <p class="login-evento">{{ nombre_evento }}</p>
         <div class="perforacion"></div>
 
-        <div class="rol-selector" id="rolSelector">
-            <button type="button" class="rol-pill activo" data-rol="vendedor">🎟️ Vendedor</button>
-            <button type="button" class="rol-pill" data-rol="portero">🔎 Portero</button>
-        </div>
-
-        <p class="login-sub" id="rolSub">Vendedor — generá entradas y tickets</p>
-        <input type="password" id="password" class="login-input" placeholder="Contraseña" autocomplete="current-password">
+        <p class="login-sub">Ingresá tu usuario y contraseña</p>
+        <input type="text" id="usuario" class="login-input" placeholder="USUARIO" autocomplete="username" autocapitalize="none">
+        <input type="password" id="password" class="login-input" placeholder="CONTRASEÑA" autocomplete="current-password">
         <button class="btn-primario" id="btnLogin">Entrar</button>
         <div class="login-error" id="loginError"></div>
     </div>
@@ -116,80 +112,26 @@
         color: var(--rojo);
         letter-spacing: 0.05em;
     }
-
-    .rol-selector {
-        display: flex;
-        gap: 6px;
-        margin-bottom: 14px;
-        padding: 4px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid var(--linea);
-        border-radius: 12px;
-    }
-
-    .rol-pill {
-        flex: 1;
-        padding: 9px 4px;
-        background: transparent;
-        border: none;
-        border-radius: 8px;
-        color: var(--texto-suave);
-        font-family: 'Archivo Black', sans-serif;
-        font-size: 0.62rem;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        cursor: pointer;
-        transition: all 0.35s var(--cubic);
-        white-space: nowrap;
-    }
-
-    .rol-pill:hover { color: var(--texto); }
-
-    .rol-pill.activo {
-        background: var(--lima);
-        color: var(--negro);
-    }
-
-    #rolSub {
-        font-family: 'Space Mono', monospace;
-        font-size: 0.6rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--texto-suave);
-        margin: -6px 0 14px;
-    }
 </style>
 {% endblock %}
 {% block scripts %}
 <script>
+    const usuario = document.getElementById('usuario');
     const input = document.getElementById('password');
     const btn = document.getElementById('btnLogin');
     const error = document.getElementById('loginError');
-    const subs = {
-        vendedor: 'Vendedor — generá entradas y tickets',
-        portero: 'Portero — validá entradas en la puerta'
-    };
-    let rol = 'vendedor';
-
-    document.querySelectorAll('.rol-pill').forEach(pill => {
-        pill.addEventListener('click', () => {
-            document.querySelectorAll('.rol-pill').forEach(p => p.classList.remove('activo'));
-            pill.classList.add('activo');
-            rol = pill.dataset.rol;
-            document.getElementById('rolSub').textContent = subs[rol];
-        });
-    });
 
     async function entrar() {
+        const user = usuario.value.trim();
         const pass = input.value;
-        if (!pass) { error.textContent = 'Ingresá la contraseña'; return; }
+        if (!user || !pass) { error.textContent = 'Ingresá usuario y contraseña'; return; }
         btn.disabled = true;
         btn.textContent = 'Entrando...';
         try {
             const res = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: pass, rol: rol })
+                body: JSON.stringify({ usuario: user, password: pass })
             });
             const data = await res.json();
             if (res.ok && data.ok) {
@@ -210,6 +152,7 @@
 
     btn.addEventListener('click', entrar);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') entrar(); });
-    input.focus();
+    usuario.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.focus(); });
+    usuario.focus();
 </script>
 {% endblock %}

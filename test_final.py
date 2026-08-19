@@ -8,7 +8,7 @@ import os
 from load_env import cargar_env
 cargar_env()
 
-from app import app, supabase, TABLA, ROLES
+from app import app, supabase, TABLA
 
 from supabase import create_client as _create_client
 _ADMIN_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
@@ -23,9 +23,11 @@ def limpiar():
 
 client = app.test_client()
 
+USUARIOS = {'vendedor': 'vendedor2026', 'portero': 'portero2026'}
 
-def login(rol):
-    return client.post('/api/login', json={'password': ROLES[rol], 'rol': rol})
+
+def login(usuario):
+    return client.post('/api/login', json={'usuario': usuario, 'password': USUARIOS[usuario]})
 
 
 def setup():
@@ -38,14 +40,18 @@ setup()
 # ------------------------------------------------------------------
 # Login
 # ------------------------------------------------------------------
-r = client.post('/api/login', json={'password': 'incorrecta', 'rol': 'vendedor'})
+r = client.post('/api/login', json={'usuario': 'vendedor', 'password': 'incorrecta'})
 assert r.status_code == 401, f"Login incorrecto debe ser 401, fue {r.status_code}"
 
-r = client.post('/api/login', json={'password': ROLES['vendedor'], 'rol': 'nada'})
-assert r.status_code == 400, "Rol invalido debe ser 400"
+r = client.post('/api/login', json={'usuario': 'noexiste', 'password': 'x'})
+assert r.status_code == 401, "Usuario inexistente debe ser 401"
+
+r = client.post('/api/login', json={'usuario': 'vendedor'})
+assert r.status_code == 400, "Login sin password debe ser 400"
 
 r = login('vendedor')
 assert r.status_code == 200 and r.get_json()['ok'], "Login vendedor debe ser 200"
+assert r.get_json()['rol'] == 'vendedor', "El rol debe venir de la base de datos"
 
 # ------------------------------------------------------------------
 # Rutas protegidas (con sesion)

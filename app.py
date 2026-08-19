@@ -15,6 +15,7 @@ import csv
 from functools import wraps
 from flask import (Flask, request, jsonify, render_template,
                    session, redirect, url_for, Response)
+from werkzeug.security import check_password_hash
 from supabase import create_client, Client
 
 # -----------------------------------------------------------
@@ -35,19 +36,15 @@ app = Flask(__name__,
 # como variable de entorno para que las sesiones sobrevivan a los deploys.
 app.secret_key = os.environ.get("SECRET_KEY", "clave-local-de-desarrollo")
 
-# Contrasenas de acceso por rol (env vars de Vercel; sin default en el codigo).
-ROLES = {
-    "vendedor": os.environ.get("SECRET_PASS_VENDEDOR", ""),
-    "portero": os.environ.get("SECRET_PASS_PORTERO", ""),
-}
-
 # Nombre del evento (para headers y footer)
 NOMBRE_EVENTO = os.environ.get("NOMBRE_EVENTO", "Fiesta Anual 2026")
 
 # Precio de cada entrada en colones
 PRECIO_ENTRADA = int(os.environ.get("PRECIO_ENTRADA", "1000"))
 
+# Tabla de usuarios (login por usuario + contrasena, rol desde la base)
 TABLA = "entradas"
+TABLA_USERS = "users"
 
 
 # -----------------------------------------------------------
@@ -116,15 +113,29 @@ def centro():
 @app.route("/api/login", methods=["POST"])
 def api_login():
     data = request.get_json(silent=True)
-    if not data or data.get("rol") not in ROLES:
-        return jsonify({"ok": False, "error": "Selecciona un rol"}), 400
-    if not ROLES[data["rol"]]:
-        return jsonify({"ok": False, "error": "Contrasena no configurada"}), 503
-    if data.get("password") != ROLES[data["rol"]]:
-        return jsonify({"ok": False, "error": "Contrasena incorrecta"}), 401
+    if not data or not data.get("usuario") or not data.get("password"):
+        return jsonify({"ok": False, "error": "Usuario y contraseña son requeridos"}), 400
+
+    usuario = data["usuario"].strip().lower()
+    try:
+        resp = supabase.table(TABLA_USERS).select("usuario,password_hash,rol,nombre") \
+            .eq("usuario", usuario).execute()
+    except Exception:
+        return jsonify({"ok": False,
+                        "error": "La tabla users no existe — ejecutá users.sql en Supabase"}), 500
+
+    if not resp.data:
+        return jsonify({"ok": False, "error": "Usuario o contraseña incorrectos"}), 401
+
+    user = resp.data[0]
+    if not check_password_hash(user["password_hash"], data["password"]):
+        return jsonify({"ok": False, "error": "Usuario o contraseña incorrectos"}), 401
+
     session["auth"] = True
-    session["rol"] = data["rol"]
-    return jsonify({"ok": True, "rol": data["rol"]})
+    session["rol"] = user["rol"]
+    session["usuario"] = user["usuario"]
+    return jsonify({"ok": True, "rol": user["rol"], "usuario": user["usuario"],
+                    "nombre": user.get("nombre", "")})
 
 
 @app.route("/api/logout", methods=["POST"])
