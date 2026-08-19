@@ -219,4 +219,80 @@ assert r.status_code == 401, "Stats sin sesion debe ser 401"
 r = client.get('/login')
 assert r.status_code == 200, "Pagina de login debe ser 200"
 
+# ------------------------------------------------------------------
+# Admin: pagina, logs y CRUD de usuarios
+# ------------------------------------------------------------------
+r = client.get('/admin')
+assert r.status_code == 302 and '/login' in r.headers.get('Location', ''), \
+    "Admin sin sesion debe redirigir a /login"
+
+r = client.get('/api/logs')
+assert r.status_code == 401, "Logs sin sesion debe ser 401"
+
+r = login('vendedor')
+r = client.get('/admin')
+assert r.status_code == 302 and '/vendedor' in r.headers.get('Location', ''), \
+    "Vendedor no puede ver /admin"
+
+r = client.get('/api/logs')
+assert r.status_code == 401, "Vendedor no puede ver logs"
+
+# Login admin
+r = client.post('/api/login', json={'usuario': 'admin', 'password': 'admin2026'})
+assert r.status_code == 200 and r.get_json()['rol'] == 'admin', "Login admin debe ser 200"
+
+r = client.get('/')
+assert r.status_code == 302 and '/admin' in r.headers.get('Location', ''), \
+    "/ debe redirigir a /admin para rol admin"
+
+r = client.get('/admin')
+assert r.status_code == 200, "Admin debe poder ver /admin"
+
+r = client.get('/vendedor')
+assert r.status_code == 200, "Admin debe poder ver /vendedor"
+r = client.get('/portero')
+assert r.status_code == 200, "Admin debe poder ver /portero"
+r = client.get('/centro')
+assert r.status_code == 200, "Admin debe poder ver /centro"
+
+# Logs registrados (login de vendedor y admin ya generaron registros)
+r = client.get('/api/logs')
+assert r.status_code == 200, "Admin debe poder ver logs"
+logs = r.get_json()['logs']
+assert len(logs) >= 1, "Debe haber al menos un log"
+acciones = {l['accion'] for l in logs}
+assert 'login' in acciones, f"Debe haber logs de login, hay {acciones}"
+
+# CRUD de usuarios
+r = client.get('/api/users')
+users = r.get_json()['users']
+assert r.status_code == 200 and len(users) >= 3, "Deben existir al menos 3 usuarios"
+
+r = client.post('/api/users', json={'usuario': 'testtemp', 'password': 'temp123', 'rol': 'vendedor', 'nombre': 'Temp'})
+assert r.status_code == 200 and r.get_json()['ok'], "Crear usuario debe funcionar"
+
+r = client.post('/api/users', json={'usuario': 'testtemp', 'password': 'x', 'rol': 'vendedor'})
+assert r.status_code == 409, "Usuario duplicado debe ser 409"
+
+r = client.post('/api/users', json={'usuario': 'malo', 'password': 'x', 'rol': 'super'})
+assert r.status_code == 400, "Rol invalido debe ser 400"
+
+nuevo = _admin.table('users').select('id').eq('usuario', 'testtemp').execute().data[0]['id']
+
+r = client.put(f'/api/users/{nuevo}', json={'rol': 'portero', 'password': 'nueva123'})
+assert r.status_code == 200 and r.get_json()['ok'], "Editar usuario debe funcionar"
+
+r = client.delete(f'/api/users/{nuevo}')
+assert r.status_code == 200 and r.get_json()['ok'], "Borrar usuario debe funcionar"
+
+# No puede borrarse a si mismo (admin)
+propio = _admin.table('users').select('id').eq('usuario', 'admin').execute().data[0]['id']
+r = client.delete(f'/api/users/{propio}')
+assert r.status_code == 400, "Admin no puede borrarse a si mismo"
+
+# El nuevo usuario creado pudo loguearse con su password anterior (edicion de password)
+client.post('/api/logout')
+r = client.post('/api/login', json={'usuario': 'admin', 'password': 'admin2026'})
+assert r.status_code == 200, "Admin sigue logueandose tras borrar/editar"
+
 print("TODOS LOS TESTS OK")

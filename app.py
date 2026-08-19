@@ -15,7 +15,7 @@ import csv
 from functools import wraps
 from flask import (Flask, request, jsonify, render_template,
                    session, redirect, url_for, Response)
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 from supabase import create_client, Client
 
 # -----------------------------------------------------------
@@ -45,6 +45,19 @@ PRECIO_ENTRADA = int(os.environ.get("PRECIO_ENTRADA", "1000"))
 # Tabla de usuarios (login por usuario + contrasena, rol desde la base)
 TABLA = "entradas"
 TABLA_USERS = "users"
+TABLA_LOGS = "logs"
+
+
+def registrar_log(accion, detalle=""):
+    """Inserta una accion en la tabla de logs (usuario desde la sesion)."""
+    try:
+        supabase.table(TABLA_LOGS).insert({
+            "accion": accion,
+            "detalle": detalle[:500],
+            "usuario": session.get("usuario", "?"),
+        }).execute()
+    except Exception:
+        pass
 
 
 # -----------------------------------------------------------
@@ -98,27 +111,36 @@ def login():
 
 
 @app.route("/")
-@require_rol("vendedor", "portero")
+@require_rol("vendedor", "portero", "admin")
 def index():
-    return redirect(url_for(session.get("rol", "vendedor")))
+    destino = session.get("rol", "vendedor")
+    if destino == "admin":
+        return redirect(url_for("admin"))
+    return redirect(url_for(destino))
 
 
 @app.route("/vendedor")
-@require_rol("vendedor")
+@require_rol("vendedor", "admin")
 def vendedor():
     return render_template("vendedor.html", nombre_evento=NOMBRE_EVENTO, rol=session.get("rol"))
 
 
 @app.route("/portero")
-@require_rol("portero")
+@require_rol("portero", "admin")
 def portero():
     return render_template("portero.html", nombre_evento=NOMBRE_EVENTO, rol=session.get("rol"))
 
 
 @app.route("/centro")
-@require_rol("vendedor", "portero")
+@require_rol("vendedor", "portero", "admin")
 def centro():
     return render_template("centro.html", nombre_evento=NOMBRE_EVENTO, rol=session.get("rol"))
+
+
+@app.route("/admin")
+@require_rol("admin")
+def admin():
+    return render_template("admin.html", nombre_evento=NOMBRE_EVENTO, rol=session.get("rol"))
 
 
 # -----------------------------------------------------------
@@ -148,12 +170,14 @@ def api_login():
     session["auth"] = True
     session["rol"] = user["rol"]
     session["usuario"] = user["usuario"]
+    registrar_log("login", f"{user.get('nombre', '')} ({user['usuario']}, {user['rol']})")
     return jsonify({"ok": True, "rol": user["rol"], "usuario": user["usuario"],
                     "nombre": user.get("nombre", "")})
 
 
 @app.route("/api/logout", methods=["POST"])
 def api_logout():
+    registrar_log("logout", session.get("usuario", "?"))
     session.clear()
     return jsonify({"ok": True})
 
@@ -162,7 +186,7 @@ def api_logout():
 # API: generar entrada
 # -----------------------------------------------------------
 @app.route("/api/generar", methods=["POST"])
-@require_rol("vendedor")
+@require_rol("vendedor", "admin")
 def api_generar():
     """Genera una nueva entrada con datos del comprador (rol vendedor)."""
     data = request.get_json(silent=True) or {}
@@ -188,6 +212,7 @@ def api_generar():
                 "cedula": cedula
             }).execute()
             if resp.data:
+                registrar_log("venta", f"{nombre} | cédula {cedula} | código {codigo}")
                 return jsonify({"ok": True, "codigo": codigo, "id": resp.data[0]["id"],
                                 "nombre": nombre, "cedula": cedula}), 201
         except Exception:
@@ -200,7 +225,7 @@ def api_generar():
 # API: validar entrada
 # -----------------------------------------------------------
 @app.route("/api/validar", methods=["POST"])
-@require_rol("portero")
+@require_rol("portero", "admin")
 def api_validar():
     """
     Valida un codigo QR (rol portero).
@@ -218,14 +243,17 @@ def api_validar():
         return jsonify({"ok": False, "error": f"Error de base de datos: {e}"}), 500
 
     if not resp.data:
+        registrar_log("escaneo", f"{codigo} — código no encontrado")
         return jsonify({"ok": False, "estado": "inexistente",
                         "error": "Codigo no encontrado"}), 404
 
     if resp.data[0]["usado"]:
+        registrar_log("escaneo", f"{codigo} — ya usado ({resp.data[0].get('nombre', '')})")
         return jsonify({"ok": False, "estado": "usado",
                         "error": "Codigo ya fue utilizado"}), 409
 
     supabase.table(TABLA).update({"usado": True}).eq("codigo", codigo).execute()
+    registrar_log("escaneo", f"{codigo} — válido, {resp.data[0].get('nombre', '')}")
 
     return jsonify({"ok": True, "estado": "valido", "codigo": codigo,
                     "nombre": resp.data[0].get("nombre", ""),
@@ -236,7 +264,7 @@ def api_validar():
 # API: contador de entradas generadas
 # -----------------------------------------------------------
 @app.route("/api/contador")
-@require_rol("vendedor", "portero")
+@require_rol("vendedor", "portero", "admin")
 def api_contador():
     try:
         resp = supabase.table(TABLA).select("id", count="exact").execute()
@@ -249,7 +277,7 @@ def api_contador():
 # API: centro de datos
 # -----------------------------------------------------------
 @app.route("/api/stats")
-@require_rol("vendedor", "portero")
+@require_rol("vendedor", "portero", "admin")
 def api_stats():
     try:
         total = supabase.table(TABLA).select("id", count="exact").execute().count
@@ -271,7 +299,7 @@ def api_stats():
 
 
 @app.route("/api/listar")
-@require_rol("vendedor", "portero")
+@require_rol("vendedor", "portero", "admin")
 def api_listar():
     try:
         resp = supabase.table(TABLA).select("id,codigo,usado,creado_en,nombre,cedula") \
@@ -282,7 +310,7 @@ def api_listar():
 
 
 @app.route("/api/reset", methods=["POST"])
-@require_rol("vendedor", "portero")
+@require_rol("vendedor", "portero", "admin")
 def api_reset():
     """Marca una entrada como no utilizada (corrige escaneos erroneos)."""
     data = request.get_json(silent=True)
@@ -295,15 +323,18 @@ def api_reset():
     if not resp.data:
         return jsonify({"ok": False, "error": "Codigo no encontrado"}), 404
 
+    registrar_log("revertir_escaneo", f"código {codigo} marcado como no usado")
     return jsonify({"ok": True, "codigo": codigo})
 
 
 @app.route("/api/borrar_todas", methods=["POST"])
-@require_rol("vendedor", "portero")
+@require_rol("vendedor", "portero", "admin")
 def api_borrar_todas():
     """Borra todas las entradas y reinicia los IDs desde 1 (rol centro)."""
     try:
+        antes = supabase.table(TABLA).select("id", count="exact").execute().count
         supabase.rpc("reset_entradas").execute()
+        registrar_log("borrado_total", f"{antes} entradas eliminadas e IDs reiniciados")
         return jsonify({"ok": True, "mensaje": "Entradas eliminadas e IDs reiniciados"})
     except Exception as e:
         return jsonify({"ok": False,
@@ -311,13 +342,15 @@ def api_borrar_todas():
 
 
 @app.route("/api/exportar")
-@require_rol("vendedor", "portero")
+@require_rol("vendedor", "portero", "admin")
 def api_exportar():
     try:
         resp = supabase.table(TABLA).select("id,codigo,usado,creado_en,nombre,cedula") \
             .order("id").execute()
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+    registrar_log("exportar_csv", f"{len(resp.data)} entradas exportadas")
 
     total = len(resp.data)
     usadas = sum(1 for r in resp.data if r["usado"])
@@ -343,6 +376,98 @@ def api_exportar():
     response = Response(output.getvalue(), mimetype="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=entradas.csv"
     return response
+
+
+# -----------------------------------------------------------
+# API: admin — logs y usuarios
+# -----------------------------------------------------------
+@app.route("/api/logs")
+@require_rol("admin")
+def api_logs():
+    try:
+        resp = supabase.table(TABLA_LOGS).select("id,accion,detalle,usuario,creado_en") \
+            .order("id", desc=True).limit(300).execute()
+        return jsonify({"logs": resp.data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/users")
+@require_rol("admin")
+def api_users_listar():
+    try:
+        resp = supabase.table(TABLA_USERS).select("id,usuario,rol,nombre") \
+            .order("id").execute()
+        return jsonify({"users": resp.data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/users", methods=["POST"])
+@require_rol("admin")
+def api_users_crear():
+    data = request.get_json(silent=True) or {}
+    usuario = (data.get("usuario") or "").strip().lower()
+    password = data.get("password") or ""
+    rol = data.get("rol") or ""
+    nombre = (data.get("nombre") or "").strip()[:60]
+
+    if not usuario or not password or rol not in ("vendedor", "portero", "admin"):
+        return jsonify({"ok": False, "error": "usuario, password y rol son requeridos"}), 400
+
+    existe = supabase.table(TABLA_USERS).select("id").eq("usuario", usuario).execute()
+    if existe.data:
+        return jsonify({"ok": False, "error": "Ese usuario ya existe"}), 409
+
+    supabase.table(TABLA_USERS).insert({
+        "usuario": usuario,
+        "password_hash": generate_password_hash(password),
+        "rol": rol,
+        "nombre": nombre,
+    }).execute()
+    registrar_log("user_crear", f"{nombre} ({usuario}, {rol})")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/users/<int:user_id>", methods=["PUT"])
+@require_rol("admin")
+def api_users_editar(user_id):
+    data = request.get_json(silent=True) or {}
+    cambios = {}
+    if "nombre" in data:
+        cambios["nombre"] = (data.get("nombre") or "").strip()[:60]
+    if "rol" in data:
+        if data["rol"] not in ("vendedor", "portero", "admin"):
+            return jsonify({"ok": False, "error": "Rol inválido"}), 400
+        cambios["rol"] = data["rol"]
+    if data.get("password"):
+        cambios["password_hash"] = generate_password_hash(data["password"])
+
+    if not cambios:
+        return jsonify({"ok": False, "error": "Nada que editar"}), 400
+
+    resp = supabase.table(TABLA_USERS).update(cambios).eq("id", user_id).execute()
+    if not resp.data:
+        return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
+
+    registrar_log("user_editar", f"id {user_id}: {list(cambios.keys())}")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/users/<int:user_id>", methods=["DELETE"])
+@require_rol("admin")
+def api_users_borrar(user_id):
+    prev = supabase.table(TABLA_USERS).select("usuario,nombre,rol").eq("id", user_id).execute()
+    if not prev.data:
+        return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
+
+    if prev.data[0]["usuario"] == session.get("usuario"):
+        return jsonify({"ok": False, "error": "No podés borrar tu propio usuario"}), 400
+
+    supabase.table(TABLA_USERS).delete().eq("id", user_id).execute()
+    u = prev.data[0]
+    registrar_log("user_borrar", f"{u.get('nombre', '')} ({u['usuario']}, {u['rol']})")
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

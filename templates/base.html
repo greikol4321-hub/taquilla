@@ -296,12 +296,16 @@
 
     {% if request.path != '/login' %}
     <nav class="tabbar">
-        {% if rol == 'vendedor' %}
+        {% if rol in ('vendedor', 'admin') %}
         <a href="/vendedor" class="{{ 'activo' if request.path in ['/vendedor', '/'] else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 1792 1792" fill="currentColor"><path d="M1024 452l316 316-572 572-316-316zm-211 979l618-618q19-19 19-45t-19-45l-362-362q-18-18-45-18t-45 18l-618 618q-19 19-19 45t19 45l362 362q18 18 45 18t45-18zm889-637l-907 908q-37 37-90.5 37t-90.5-37l-126-126q56-56 56-136t-56-136-136-56-136 56l-125-126q-37-37-37-90.5t37-90.5l907-906q37-37 90.5-37t90.5 37l125 125q-56 56-56 136t56 136 136 56 136-56l126 125q37 37 37 90.5t-37 90.5z"/></svg></span>Vendedor</a>
-        {% else %}
+        {% endif %}
+        {% if rol in ('portero', 'admin') %}
         <a href="/portero" class="{{ 'activo' if request.path == '/portero' else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></span>Portero</a>
         {% endif %}
         <a href="/centro" class="{{ 'activo' if request.path == '/centro' else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h8"/><path d="M7 11h12"/><path d="M7 6h3"/></svg></span>Centro</a>
+        {% if rol == 'admin' %}
+        <a href="/admin" class="{{ 'activo' if request.path == '/admin' else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg></span>Admin</a>
+        {% endif %}
     </nav>
     <div class="toast" id="toast"></div>
     <script>
