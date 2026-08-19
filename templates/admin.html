@@ -144,6 +144,51 @@
 
     .empty { text-align: center; color: var(--texto-suave); font-family: 'Space Mono', monospace; font-size: 0.68rem; padding: 18px 0; }
 
+    .modal-edit {
+        background: var(--negro-2);
+        border: 1px solid var(--linea);
+        border-radius: 16px;
+        padding: 20px;
+        width: min(92vw, 340px);
+        color: var(--texto);
+        animation: pop 0.3s var(--cubic) both;
+    }
+
+    .modal-edit::backdrop { background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(3px); }
+
+    .modal-edit form { display: flex; flex-direction: column; gap: 9px; }
+
+    .modal-edit h3 {
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 0.8rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .modal-edit h3 svg { color: var(--lima); flex-shrink: 0; }
+
+    .modal-edit input, .modal-edit select {
+        width: 100%;
+        padding: 11px 14px;
+        background: var(--negro);
+        border: 1px solid var(--linea);
+        border-radius: 10px;
+        color: var(--texto);
+        font-family: 'Space Mono', monospace;
+        font-size: 0.72rem;
+        outline: none;
+    }
+
+    .modal-edit input:focus, .modal-edit select:focus { border-color: var(--lima); }
+
+    .modal-botones { display: flex; gap: 9px; justify-content: flex-end; margin-top: 6px; }
+
+    .modal-botones .btn-primario { padding: 10px 20px; font-size: 0.75rem; }
+
     @media (max-width: 380px) {
         .form-user .fila { flex-direction: column; }
     }
@@ -196,6 +241,24 @@
         </div>
     </section>
 </div>
+
+<dialog class="modal-edit" id="modalEdit">
+    <form id="formEdit">
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> Editar usuario</h3>
+        <input type="text" id="eNombre" placeholder="Nombre">
+        <input type="text" id="eUsuario" placeholder="Usuario" autocomplete="off">
+        <select id="eRol">
+            <option value="vendedor">Vendedor</option>
+            <option value="portero">Portero</option>
+            <option value="admin">Admin</option>
+        </select>
+        <input type="password" id="ePassword" placeholder="Contraseña (vacío = no cambiar)" autocomplete="new-password">
+        <div class="modal-botones">
+            <button type="button" class="btn-mini" id="btnCancelarEdit">Cancelar</button>
+            <button type="submit" class="btn-primario">Guardar</button>
+        </div>
+    </form>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
@@ -293,12 +356,15 @@
             document.getElementById('uUsuario').value = '';
             document.getElementById('uPassword').value = '';
             document.getElementById('uNombre').value = '';
-            mostrarToast('Usuario creado');
+            mostrarToast('Usuario creado', 'ok');
             cargarUsers(); cargarLogs();
         } else {
-            mostrarToast(data.error || 'Error');
+            mostrarToast(data.error || 'Error', 'error');
         }
     });
+
+    let editandoId = null;
+    const modalEdit = document.getElementById('modalEdit');
 
     document.getElementById('usersBody').addEventListener('click', async e => {
         const btn = e.target.closest('button[data-edit], button[data-del]');
@@ -307,19 +373,35 @@
         if (btn.dataset.del) {
             if (!confirm('¿Borrar este usuario?')) return;
             const data = await api(`/api/users/${id}`, { method: 'DELETE' });
-            if (data.ok) { mostrarToast('Usuario borrado'); cargarUsers(); cargarLogs(); }
-            else mostrarToast(data.error || 'Error');
+            if (data.ok) { mostrarToast('Usuario borrado', 'ok'); cargarUsers(); cargarLogs(); }
+            else mostrarToast(data.error || 'Error', 'error');
             return;
         }
-        const nuevoRol = prompt('Nuevo rol (vendedor, portero o admin):');
-        if (nuevoRol === null) return;
-        const nuevaPass = prompt('Nueva contraseña (vacío = no cambiar):');
-        const body = { rol: nuevoRol.trim().toLowerCase() };
-        if (nuevaPass && nuevaPass.trim()) body.password = nuevaPass.trim();
-        const data = await api(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(body) });
-        if (data.ok) { mostrarToast('Usuario editado'); cargarUsers(); cargarLogs(); }
-        else mostrarToast(data.error || 'Error');
+        editandoId = id;
+        const celdas = btn.closest('tr').children;
+        document.getElementById('eNombre').value = celdas[1].textContent;
+        document.getElementById('eUsuario').value = celdas[0].textContent.trim();
+        document.getElementById('eRol').value = celdas[2].textContent;
+        document.getElementById('ePassword').value = '';
+        modalEdit.showModal();
+        document.getElementById('eNombre').focus();
     });
+
+    document.getElementById('formEdit').addEventListener('submit', async e => {
+        e.preventDefault();
+        const body = {
+            nombre: document.getElementById('eNombre').value,
+            rol: document.getElementById('eRol').value
+        };
+        const pass = document.getElementById('ePassword').value;
+        if (pass.trim()) body.password = pass.trim();
+        const data = await api(`/api/users/${editandoId}`, { method: 'PUT', body: JSON.stringify(body) });
+        modalEdit.close();
+        if (data.ok) { mostrarToast('Usuario editado', 'ok'); cargarUsers(); cargarLogs(); }
+        else mostrarToast(data.error || 'Error', 'error');
+    });
+
+    document.getElementById('btnCancelarEdit').addEventListener('click', () => modalEdit.close());
 
     document.getElementById('filtroLogs').addEventListener('input', cargarLogs);
 

@@ -254,6 +254,9 @@
 
         .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+        .toast.ok { border-color: #7ee787; color: #7ee787; }
+        .toast.error { border-color: var(--rojo); color: var(--rojo); }
+
         /* ---------- Animaciones ---------- */
         @keyframes sube {
             from { opacity: 0; transform: translateY(18px); filter: blur(6px); }
@@ -311,8 +314,10 @@
     <script>
         const toastEl = document.getElementById('toast');
         let toastTimer = null;
-        function mostrarToast(msg) {
+        function mostrarToast(msg, tipo) {
             toastEl.textContent = msg;
+            toastEl.classList.remove('ok', 'error');
+            if (tipo) toastEl.classList.add(tipo);
             toastEl.classList.add('show');
             clearTimeout(toastTimer);
             toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
