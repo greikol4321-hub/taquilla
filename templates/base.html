@@ -99,6 +99,32 @@
             margin-top: 3px;
         }
 
+        .evento-selector {
+            flex: 1;
+            max-width: 200px;
+        }
+
+        .evento-selector .selector {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--negro);
+            border: 1px solid var(--linea);
+            border-radius: 999px;
+            color: var(--texto);
+            font-family: 'Space Mono', monospace;
+            font-size: 0.68rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.35s var(--cubic);
+        }
+
+        .evento-selector .selector:focus {
+            border-color: var(--lima);
+            background: rgba(217, 255, 61, 0.05);
+        }
+
         .btn-logout {
             background: transparent;
             border: 1px solid var(--linea);
@@ -285,6 +311,13 @@
                 <div class="subtitulo">Sistema de Entradas</div>
             </div>
         </div>
+        {% if rol == 'admin' %}
+        <div class="evento-selector" id="eventoSelector">
+            <select class="selector" id="eventoSelect" data-current="{{ evento_id or '' }}">
+                <option value="">Seleccionar evento…</option>
+            </select>
+        </div>
+        {% endif %}
         <button class="btn-logout" id="btnLogout">Salir</button>
     </header>
     {% endif %}
@@ -326,6 +359,42 @@
             await fetch('/api/logout', { method: 'POST' });
             location.href = '/login';
         });
+
+        {% if rol == 'admin' %}
+        async function cargarEventos() {
+            const select = document.getElementById('eventoSelect');
+            const currentId = select.dataset.current;
+            try {
+                const res = await fetch('/api/eventos');
+                const data = await res.json();
+                select.innerHTML = '<option value="">Seleccionar evento…</option>';
+                (data.eventos || []).forEach(ev => {
+                    const opt = document.createElement('option');
+                    opt.value = ev.id;
+                    opt.textContent = ev.nombre + ' (₡' + ev.precio_entrada + ')';
+                    if (String(ev.id) === currentId) opt.selected = true;
+                    select.appendChild(opt);
+                });
+                document.getElementById('eventoSelector').style.display = 'block';
+            } catch (e) {
+                console.error('Error al cargar eventos:', e);
+            }
+            }
+        }
+
+        document.getElementById('eventoSelect').addEventListener('change', async function() {
+            const id = this.value;
+            if (!id) return;
+            await fetch('/api/evento/select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ evento_id: parseInt(id) })
+            });
+            location.reload();
+        });
+
+        cargarEventos();
+        {% endif %}
     </script>
     {% endif %}
     {% block scripts %}{% endblock %}

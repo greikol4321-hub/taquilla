@@ -91,6 +91,7 @@
     .chip.borrado_total { color: var(--rojo); border-color: rgba(255, 77, 77, 0.4); }
     .chip.login, .chip.logout { color: #c9a2ff; border-color: rgba(201, 162, 255, 0.4); }
     .chip.user_crear, .chip.user_editar, .chip.user_borrar { color: #ffd166; border-color: rgba(255, 209, 102, 0.4); }
+    .chip.badge-pendiente { color: var(--rojo); border-color: rgba(255, 77, 77, 0.4); }
 
     .detalle { color: var(--texto-suave); font-size: 0.7rem; max-width: 260px; }
 
@@ -139,8 +140,8 @@
     .form-user input:focus, .form-user select:focus { border-color: var(--lima); }
 
     .form-user .fila { display: flex; gap: 9px; }
-
     .form-user .fila input[type="text"], .form-user .fila input[type="password"] { flex: 1; }
+    .form-evento .fila input { flex: 1; }
 
     .empty { text-align: center; color: var(--texto-suave); font-family: 'Space Mono', monospace; font-size: 0.68rem; padding: 18px 0; }
 
@@ -199,6 +200,27 @@
 {% block content %}
 <div class="admin-grid">
     <section class="panel" style="animation-delay:0s">
+        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><path d="M12 11h-2a2 2 0 0 0-2 2v3h8v-3a2 2 0 0 0-2-2h-2z"/></svg> Eventos <span class="count" id="countEventos">0</span></h2>
+
+        <form class="form-evento" id="formEvento">
+            <div class="fila">
+                <input type="text" id="eNombre" class="flex-1" placeholder="Nombre del evento" autocomplete="off" maxlength="100">
+                <input type="number" id="ePrecio" placeholder="Precio (₡)" min="0" step="1" autocomplete="off">
+                <button class="btn-primario" type="submit" style="padding:12px 18px;font-size:0.75rem">Crear evento</button>
+            </div>
+        </form>
+
+        <div class="tabla-wrap">
+            <table>
+                <thead>
+                    <tr><th>Evento</th><th>Precio</th><th>Estado</th><th>Activo</th><th></th></tr>
+                </thead>
+                <tbody id="eventosBody"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel" style="animation-delay:0.03s">
         <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg> Usuarios <span class="count" id="countUsers">0</span></h2>
 
         <form class="form-user" id="formUser">
@@ -260,6 +282,21 @@
         </div>
     </form>
 </dialog>
+
+<dialog class="modal-edit" id="modalEvento">
+    <form id="formEventoEdit">
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Editar evento</h3>
+        <input type="text" id="eeNombre" placeholder="Nombre del evento">
+        <input type="number" id="eePrecio" placeholder="Precio entrada (₡)" min="0" step="1">
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.7rem;color:var(--texto-suave)">
+            <input type="checkbox" id="eeActivo"> Evento activo
+        </label>
+        <div class="modal-botones">
+            <button type="button" class="btn-mini" id="btnCancelarEvento">Cancelar</button>
+            <button type="submit" class="btn-primario">Guardar</button>
+        </div>
+    </form>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
@@ -274,13 +311,100 @@
         'exportar_csv': 'Exportar CSV',
         'user_crear': 'Crear usuario',
         'user_editar': 'Editar usuario',
-        'user_borrar': 'Borrar usuario'
+        'user_borrar': 'Borrar usuario',
+        'evento_crear': 'Crear evento',
+        'evento_editar': 'Editar evento',
+        'evento_borrar': 'Borrar evento',
+        'evento_seleccionar': 'Seleccionar evento'
     };
 
     async function api(url, opciones = {}) {
         const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opciones });
         return r.json();
     }
+
+    // ---------- Eventos ----------
+    let editandoEventoId = null;
+
+    async function cargarEventos() {
+        const data = await api('/api/eventos');
+        document.getElementById('countEventos').textContent = data.eventos ? data.eventos.length : 0;
+        const body = document.getElementById('eventosBody');
+        body.innerHTML = '';
+        if (!data.eventos || !data.eventos.length) {
+            body.innerHTML = '<tr><td colspan="5" class="empty">No hay eventos creados</td></tr>';
+            return;
+        }
+        for (const ev of data.eventos) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-family:'Space Mono',monospace;font-size:0.7rem">${ev.nombre}</td>
+                <td><span class="chip">₡${ev.precio_entrada}</span></td>
+                <td><span class="chip ${ev.activo ? '' : 'badge-pendiente'}">${ev.activo ? 'Abierto' : 'Cerrado'}</span></td>
+                <td>${ev.id == {{ evento_id or 0 }} ? '<span class="chip">Activo</span>' : ''}</td>
+                <td><div class="acciones">
+                    <button class="btn-mini" data-edit-ev="${ev.id}">Editar</button>
+                    <button class="btn-mini rojo" data-del-ev="${ev.id}">Borrar</button>
+                </div></td>`;
+            body.appendChild(tr);
+        }
+    }
+
+    document.getElementById('formEvento').addEventListener('submit', async e => {
+        e.preventDefault();
+        const nombre = document.getElementById('eNombre').value.trim();
+        const precio = parseInt(document.getElementById('ePrecio').value) || 1000;
+        if (!nombre) { mostrarToast('Ingresá un nombre para el evento', 'error'); return; }
+        const data = await api('/api/eventos', {
+            method: 'POST',
+            body: JSON.stringify({ nombre, precio })
+        });
+        if (data.ok) {
+            document.getElementById('eNombre').value = '';
+            document.getElementById('ePrecio').value = '';
+            mostrarToast('Evento creado', 'ok');
+            cargarEventos(); cargarLogs();
+        } else {
+            mostrarToast(data.error || 'Error', 'error');
+        }
+    });
+
+    const modalEvento = document.getElementById('modalEvento');
+
+    document.getElementById('eventosBody').addEventListener('click', async e => {
+        const btn = e.target.closest('button[data-edit-ev], button[data-del-ev]');
+        if (!btn) return;
+        const id = parseInt(btn.dataset.editEv || btn.dataset.delEv);
+        if (btn.dataset.delEv) {
+            if (!confirm('¿Borrar el evento "' + btn.closest('tr').children[0].textContent + '"? Se borrarán sus entradas y usuarios.')) return;
+            const data = await api(`/api/eventos/${id}`, { method: 'DELETE' });
+            if (data.ok) { mostrarToast('Evento borrado', 'ok'); cargarEventos(); }
+            else mostrarToast(data.error || 'Error', 'error');
+            return;
+        }
+        editandoEventoId = id;
+        const row = btn.closest('tr');
+        document.getElementById('eeNombre').value = row.children[0].textContent;
+        document.getElementById('eePrecio').value = row.children[1].textContent.replace(/[^0-9]/g, '');
+        document.getElementById('eeActivo').checked = row.children[3].textContent !== '';
+        modalEvento.showModal();
+        document.getElementById('eeNombre').focus();
+    });
+
+    document.getElementById('formEventoEdit').addEventListener('submit', async e => {
+        e.preventDefault();
+        const body = {
+            nombre: document.getElementById('eeNombre').value.trim(),
+            precio_entrada: parseInt(document.getElementById('eePrecio').value) || 0,
+            activo: document.getElementById('eeActivo').checked
+        };
+        const data = await api(`/api/eventos/${editandoEventoId}`, { method: 'PUT', body: JSON.stringify(body) });
+        modalEvento.close();
+        if (data.ok) { mostrarToast('Evento actualizado', 'ok'); cargarEventos(); }
+        else mostrarToast(data.error || 'Error', 'error');
+    });
+
+    document.getElementById('btnCancelarEvento').addEventListener('click', () => modalEvento.close());
 
     function chipClase(accion) {
         if (['user_crear', 'user_editar', 'user_borrar'].includes(accion)) return 'user_crear';
@@ -407,6 +531,7 @@
 
     document.getElementById('filtroLogs').addEventListener('input', cargarLogs);
 
+    cargarEventos();
     cargarLogs();
     cargarUsers();
     setInterval(cargarLogs, 15000);

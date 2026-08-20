@@ -399,13 +399,24 @@
         const cedula = document.getElementById('inputCedula').value.trim();
         let ok = true;
 
+        const cedulaOk = /^\d{1,2}-\d{4}-\d{4}$/.test(cedula);
+
         [['inputNombre', nombre], ['inputCedula', cedula]].forEach(([id, v]) => {
             const el = document.getElementById(id);
             el.classList.toggle('error', !v);
             if (!v) ok = false;
         });
+
+        if (!cedulaOk) {
+            document.getElementById('inputCedula').classList.add('error');
+            ok = false;
+        }
         if (!ok) {
-            mostrarToast('Completá nombre y cédula');
+            if (!cedulaOk && cedula) {
+                mostrarToast('Cédula en formato: X-XXXX-XXXX (ej. 6-0510-0347)');
+            } else {
+                mostrarToast('Completá nombre y cédula');
+            }
             return;
         }
 

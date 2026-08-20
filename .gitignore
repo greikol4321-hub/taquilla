@@ -4,4 +4,4 @@ __pycache__/
 .vercel/
 verify_prod.py
 entradas.db
-.playwright-mcp/
+.playwright-mcp/supabase/.temp/

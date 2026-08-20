@@ -1,12 +1,55 @@
--- ============================================================
--- Optimizacion de base + triggers (Multi-Evento)
--- ============================================================
+-- Migracion: Multi-Evento (para bases existentes)
+-- Combina migrar_multievento.sql + optimizacion.sql
 
--- 1) Extension trigram: acelera las busquedas ILIKE '%...%'
+-- 1) Extension
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- 2) Indices por evento (filtros WHERE evento_id = X en todas partes)
+-- 2) Tabla de eventos
+CREATE TABLE IF NOT EXISTS eventos (
+    id              SERIAL PRIMARY KEY,
+    nombre          TEXT NOT NULL UNIQUE,
+    precio_entrada  INTEGER NOT NULL DEFAULT 1000 CHECK (precio_entrada >= 0),
+    activo          BOOLEAN DEFAULT true,
+    creado_en       TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- 3) Agregar columnas a tablas existentes
+ALTER TABLE entradas ADD COLUMN IF NOT EXISTS evento_id INTEGER REFERENCES eventos(id) ON DELETE CASCADE;
+ALTER TABLE entradas ADD COLUMN IF NOT EXISTS precio INTEGER DEFAULT 0;
+ALTER TABLE entradas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE users ADD COLUMN IF NOT EXISTS evento_id INTEGER REFERENCES eventos(id) ON DELETE SET NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS creado_en TIMESTAMPTZ DEFAULT now();
+ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE logs ADD COLUMN IF NOT EXISTS evento_id INTEGER REFERENCES eventos(id) ON DELETE SET NULL;
+
+-- 4) Crear evento por defecto y asociar datos existentes
+INSERT INTO eventos (nombre, precio_entrada) VALUES ('Baile CTPM 2026', 1000)
+    ON CONFLICT (nombre) DO NOTHING;
+
+UPDATE entradas SET evento_id = 1 WHERE evento_id IS NULL;
+UPDATE users SET evento_id = 1 WHERE evento_id IS NULL AND rol != 'admin';
+
+-- 5) Migrar precio de entradas existentes
+UPDATE entradas e SET precio = (SELECT precio_entrada FROM eventos WHERE id = e.evento_id)
+    WHERE e.precio IS NULL OR e.precio = 0;
+
+-- 6) Cambiar constraint de unique: codigo global → (evento_id, codigo)
+ALTER TABLE entradas DROP CONSTRAINT IF EXISTS entradas_codigo_key;
+DROP INDEX IF EXISTS idx_entradas_codigo;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_entradas_codigo_evento ON entradas (evento_id, codigo);
+
+-- 7) Cambiar unique de usuario: usuario global → parciales
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_usuario_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_usuario_global
+    ON users (usuario) WHERE evento_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_usuario_evento
+    ON users (evento_id, usuario) WHERE evento_id IS NOT NULL;
+
+-- 8) Asegurar que admin existente tenga evento_id = NULL
+UPDATE users SET evento_id = NULL WHERE rol = 'admin';
+
+-- 9) Indices por evento
 CREATE INDEX IF NOT EXISTS idx_entradas_evento_usado ON entradas (evento_id, usado);
 CREATE INDEX IF NOT EXISTS idx_entradas_evento_nombre_trgm ON entradas USING GIN (nombre gin_trgm_ops) WHERE evento_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_entradas_evento_cedula_trgm ON entradas USING GIN (cedula gin_trgm_ops) WHERE evento_id IS NOT NULL;
@@ -16,7 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_logs_creado ON logs (creado_en DESC);
 CREATE INDEX IF NOT EXISTS idx_logs_usuario ON logs (usuario);
 CREATE INDEX IF NOT EXISTS idx_users_evento_rol ON users (evento_id, rol);
 
--- 3) updated_at automatico en entradas, users y eventos
+-- 10) updated_at automatico en entradas, users y eventos
 CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
 BEGIN
     NEW.updated_at = now();
@@ -36,7 +79,7 @@ DROP TRIGGER IF EXISTS trg_eventos_updated ON eventos;
 CREATE TRIGGER trg_eventos_updated BEFORE UPDATE ON eventos
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
--- 4) Proteccion: no se puede borrar ni degradar al ultimo admin
+-- 11) Proteccion: no se puede borrar ni degradar al ultimo admin
 CREATE OR REPLACE FUNCTION proteger_ultimo_admin() RETURNS trigger AS $$
 DECLARE
     admins INT;
@@ -61,7 +104,7 @@ DROP TRIGGER IF EXISTS trg_users_proteger_admin ON users;
 CREATE TRIGGER trg_users_proteger_admin BEFORE UPDATE OR DELETE ON users
     FOR EACH ROW EXECUTE FUNCTION proteger_ultimo_admin();
 
--- 5) reset_entradas parametrizado por evento (TRUNCATE mas rapido)
+-- 12) reset_entradas parametrizado por evento
 CREATE OR REPLACE FUNCTION reset_entradas(p_evento_id INTEGER DEFAULT NULL) RETURNS void AS $$
 BEGIN
     IF p_evento_id IS NOT NULL THEN
