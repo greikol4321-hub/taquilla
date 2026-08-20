@@ -4,16 +4,17 @@ Sistema de Venta y Validacion de Entradas con Codigos QR — Multi-Evento
 Backend: Flask + Supabase (PostgreSQL serverless)
 Deploy: Vercel (funcion serverless)
 
-Caracteristicas multi-evento:
-  - Un "admin general" gestiona varios eventos desde un solo panel.
-  - Cada evento tiene su propio nombre y precio de entrada.
-  - Usuarios con roles (vendedor/portero) estan asociados a un evento.
-  - Admin global (evento_id = NULL) puede gestionar todos los eventos.
-  - Todos los datos (entradas, logs, usuarios) se filtran por evento.
+Modelo de usuarios:
+  - La tabla users es GLOBAL: rol 'admin' (administra todo) o NULL (staff).
+  - El staff se asigna a eventos via evento_usuarios (evento_id, usuario_id, rol).
+    Un usuario puede estar en varios eventos con roles distintos.
+  - Al iniciar sesion:
+      * admin -> va directo al panel de administracion (dashboard global).
+      * staff con 1 evento activo -> entra directo a vendedor/portero.
+      * staff con varios eventos -> elige evento en /elegir.
+  - El admin NO opera: no vende ni valida, solo administra.
+  - Todos los datos (entradas, logs) se filtran por el evento activo en sesion.
   - Cedula validada en formato costa-ricense: X-XXXX-XXXX (ej. 6-0510-0347)
-
-Acceso: login con usuario + password (hash scrypt). El hash se almacena
-en la tabla users. El rol se lee de la base de datos.
 """
 
 import os
@@ -65,6 +66,7 @@ TABLA = "entradas"
 TABLA_USERS = "users"
 TABLA_LOGS = "logs"
 TABLA_EVENTOS = "eventos"
+TABLA_ASIGNACIONES = "evento_usuarios"
 
 # Regex: cedula costa-ricense X-XXXX-XXXX (ej. 6-0510-0347)
 CEDULA_CR = re.compile(r'^\d{1,2}-\d{4}-\d{4}$')
@@ -75,12 +77,15 @@ CEDULA_CR = re.compile(r'^\d{1,2}-\d{4}-\d{4}$')
 # -----------------------------------------------------------
 @app.context_processor
 def inject_evento():
+    es_admin = session.get("rol") == "admin"
     return {
-        "nombre_evento": session.get("evento_nombre", NOMBRE_EVENTO_DEFAULT),
+        "nombre_evento": ("Panel de administración" if es_admin
+                          else session.get("evento_nombre", NOMBRE_EVENTO_DEFAULT)),
         "evento_id": session.get("evento_id"),
         "precio_entrada": session.get("precio_entrada", 0),
         "rol": session.get("rol", ""),
         "usuario": session.get("usuario", ""),
+        "multi_evento": session.get("multi_evento", False),
     }
 
 
@@ -141,6 +146,24 @@ def entrada_duplicada(nombre, cedula, evento_id):
     return None
 
 
+def asignaciones_usuario(usuario_id):
+    """Devuelve las asignaciones activas de un usuario: [{evento_id, nombre, precio, rol}]."""
+    resp = supabase.table(TABLA_ASIGNACIONES) \
+        .select("evento_id, rol, eventos(nombre, precio_entrada, activo)") \
+        .eq("usuario_id", usuario_id).execute()
+    eventos = []
+    for a in resp.data or []:
+        ev = a.get("eventos") or {}
+        if ev.get("activo", True):
+            eventos.append({
+                "evento_id": a["evento_id"],
+                "nombre": ev.get("nombre", ""),
+                "precio_entrada": ev.get("precio_entrada", 0),
+                "rol": a["rol"],
+            })
+    return sorted(eventos, key=lambda e: e["evento_id"])
+
+
 # -----------------------------------------------------------
 # Control de acceso
 # -----------------------------------------------------------
@@ -152,12 +175,15 @@ def require_rol(*roles):
                 if request.path.startswith("/api"):
                     return jsonify({"ok": False, "error": "No autorizado"}), 401
                 return redirect(url_for("login"))
-            if session.get("rol") not in roles:
+            if session.get("rol") not in roles and \
+                    not (session.get("multi_evento") and "elegir" in roles):
                 if request.path.startswith("/api"):
                     return jsonify({"ok": False, "error": "Rol sin permiso"}), 401
                 destino = session.get("rol")
                 if destino in ("vendedor", "portero", "admin"):
                     return redirect(url_for(destino))
+                if destino == "elegir":
+                    return redirect(url_for("elegir"))
                 return redirect(url_for("login"))
             return f(*args, **kwargs)
         return wrapper
@@ -178,35 +204,43 @@ def login():
 
 
 @app.route("/")
-@require_rol("vendedor", "portero", "admin")
+@require_rol("vendedor", "portero", "admin", "elegir")
 def index():
     destino = session.get("rol", "vendedor")
     if destino == "admin":
         return redirect(url_for("admin"))
+    if destino == "elegir":
+        return redirect(url_for("elegir"))
     return redirect(url_for(destino))
 
 
+@app.route("/elegir")
+@require_rol("elegir")
+def elegir():
+    return render_template("elegir.html")
+
+
 @app.route("/vendedor")
-@require_rol("vendedor", "admin")
+@require_rol("vendedor")
 def vendedor():
-    ev = evento_acts()
-    if not ev and session.get("rol") != "admin":
-        return redirect(url_for("login"))
+    if not require_evento():
+        return redirect(url_for("elegir"))
     return render_template("vendedor.html", rol=session.get("rol"))
 
 
 @app.route("/portero")
-@require_rol("portero", "admin")
+@require_rol("portero")
 def portero():
-    ev = evento_acts()
-    if not ev and session.get("rol") != "admin":
-        return redirect(url_for("login"))
+    if not require_evento():
+        return redirect(url_for("elegir"))
     return render_template("portero.html", rol=session.get("rol"))
 
 
 @app.route("/centro")
-@require_rol("vendedor", "portero", "admin")
+@require_rol("vendedor", "portero")
 def centro():
+    if not require_evento():
+        return redirect(url_for("elegir"))
     return render_template("centro.html", rol=session.get("rol"))
 
 
@@ -228,7 +262,7 @@ def api_login():
     usuario = data["usuario"].strip().lower()
     try:
         resp = supabase.table(TABLA_USERS).select(
-            "usuario,password_hash,rol,nombre,evento_id"
+            "id,usuario,password_hash,rol,nombre"
         ).eq("usuario", usuario).execute()
     except Exception:
         return jsonify({"ok": False,
@@ -242,31 +276,49 @@ def api_login():
         return jsonify({"ok": False, "error": "Usuario o contraseña incorrectos"}), 401
 
     session["auth"] = True
-    session["rol"] = user["rol"]
     session["usuario"] = user["usuario"]
     session["nombre"] = user.get("nombre") or ""
+    session["multi_evento"] = False
 
-    # Set evento context from user record
-    if user.get("evento_id"):
-        ev = supabase.table(TABLA_EVENTOS).select("id,nombre,precio_entrada") \
-            .eq("id", user["evento_id"]).execute()
-        if ev.data:
-            session["evento_id"] = ev.data[0]["id"]
-            session["evento_nombre"] = ev.data[0]["nombre"]
-            session["precio_entrada"] = ev.data[0]["precio_entrada"]
+    # Admin global: entra directo, no opera sobre eventos
+    if user["rol"] == "admin":
+        session["rol"] = "admin"
+        session["evento_id"] = None
+        session["evento_nombre"] = None
+        session["precio_entrada"] = 0
+        destino = "admin"
+        registrar_log("login", f"{user.get('nombre', '')} ({user['usuario']}, admin)")
+        return jsonify({"ok": True, "rol": "admin", "destino": "/admin",
+                        "usuario": user["usuario"], "nombre": user.get("nombre", "")})
 
-    # Admin global: auto-seleccionar evento si solo hay uno activo
-    if user["rol"] == "admin" and not session.get("evento_id"):
-        evs = supabase.table(TABLA_EVENTOS).select("id,nombre,precio_entrada") \
-            .eq("activo", True).order("id").execute()
-        if evs.data and len(evs.data) == 1:
-            session["evento_id"] = evs.data[0]["id"]
-            session["evento_nombre"] = evs.data[0]["nombre"]
-            session["precio_entrada"] = evs.data[0]["precio_entrada"]
+    # Staff: buscar asignaciones en eventos activos
+    asignaciones = asignaciones_usuario(user["id"])
+    if not asignaciones:
+        return jsonify({"ok": False,
+                        "error": "Este usuario no está asignado a ningún evento activo"}), 401
 
-    registrar_log("login", f"{user.get('nombre', '')} ({user['usuario']}, {user['rol']})")
-    return jsonify({"ok": True, "rol": user["rol"], "usuario": user["usuario"],
-                    "nombre": user.get("nombre", ""), "evento_id": user.get("evento_id")})
+    if len(asignaciones) == 1:
+        a = asignaciones[0]
+        session["rol"] = a["rol"]
+        session["evento_id"] = a["evento_id"]
+        session["evento_nombre"] = a["nombre"]
+        session["precio_entrada"] = a["precio_entrada"]
+        destino = a["rol"]
+        registrar_log("login", f"{user.get('nombre', '')} ({user['usuario']}, "
+                               f"{a['rol']} · {a['nombre']})")
+        return jsonify({"ok": True, "rol": a["rol"], "destino": f"/{a['rol']}",
+                        "usuario": user["usuario"], "nombre": user.get("nombre", ""),
+                        "evento_id": a["evento_id"], "evento_nombre": a["nombre"]})
+
+    # Varios eventos: elegir
+    session["rol"] = "elegir"
+    session["evento_id"] = None
+    session["evento_nombre"] = None
+    session["precio_entrada"] = 0
+    session["multi_evento"] = True
+    registrar_log("login", f"{user.get('nombre', '')} ({user['usuario']}, multi-evento)")
+    return jsonify({"ok": True, "rol": "elegir", "destino": "/elegir",
+                    "usuario": user["usuario"], "nombre": user.get("nombre", "")})
 
 
 @app.route("/api/logout", methods=["POST"])
@@ -277,7 +329,7 @@ def api_logout():
 
 
 # -----------------------------------------------------------
-# API: eventos (admin CRUD + selection)
+# API: eventos (admin CRUD)
 # -----------------------------------------------------------
 @app.route("/api/eventos")
 @require_rol("admin")
@@ -381,41 +433,49 @@ def api_evento_borrar(evento_id):
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/mis_eventos")
+@require_rol("elegir")
+def api_mis_eventos():
+    """Eventos activos del usuario logueado, para la pantalla /elegir."""
+    user = supabase.table(TABLA_USERS).select("id").eq("usuario", session["usuario"]).execute()
+    if not user.data:
+        return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
+    return jsonify({"eventos": asignaciones_usuario(user.data[0]["id"])})
+
+
 @app.route("/api/evento/select", methods=["POST"])
-@require_rol("admin")
+@require_rol("elegir")
 def api_evento_select():
+    """El staff elige el evento al que quiere entrar (solo los asignados)."""
     data = request.get_json(silent=True) or {}
     evento_id = data.get("evento_id")
     if not evento_id:
         return jsonify({"ok": False, "error": "evento_id requerido"}), 400
 
-    resp = supabase.table(TABLA_EVENTOS).select("id,nombre,precio_entrada,activo") \
-        .eq("id", evento_id).execute()
-    if not resp.data:
-        return jsonify({"ok": False, "error": "Evento no encontrado"}), 404
+    user = supabase.table(TABLA_USERS).select("id").eq("usuario", session["usuario"]).execute()
+    if not user.data:
+        return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
 
-    session["evento_id"] = int(evento_id)
-    session["evento_nombre"] = resp.data[0]["nombre"]
-    session["precio_entrada"] = resp.data[0]["precio_entrada"]
-    registrar_log("evento_seleccionar", f"{resp.data[0]['nombre']}")
-    return jsonify({"ok": True, "evento": resp.data[0]})
+    asignaciones = asignaciones_usuario(user.data[0]["id"])
+    elegido = next((a for a in asignaciones if a["evento_id"] == int(evento_id)), None)
+    if not elegido:
+        return jsonify({"ok": False, "error": "No estás asignado a ese evento"}), 403
 
-
-@app.route("/api/evento/actual")
-@require_rol("admin")
-def api_evento_actual():
-    return jsonify({
-        "evento_id": session.get("evento_id"),
-        "evento_nombre": session.get("evento_nombre"),
-        "precio_entrada": session.get("precio_entrada", 0),
-    })
+    session["rol"] = elegido["rol"]
+    session["evento_id"] = elegido["evento_id"]
+    session["evento_nombre"] = elegido["nombre"]
+    session["precio_entrada"] = elegido["precio_entrada"]
+    registrar_log("evento_seleccionar", f"{elegido['nombre']} ({elegido['rol']})")
+    return jsonify({"ok": True, "destino": f"/{elegido['rol']}",
+                    "evento": {"id": elegido["evento_id"], "nombre": elegido["nombre"],
+                               "precio_entrada": elegido["precio_entrada"]}})
 
 
 # -----------------------------------------------------------
 # API: generar entrada
 # -----------------------------------------------------------
 @app.route("/api/generar", methods=["POST"])
-@require_rol("vendedor", "admin")
+@require_rol("vendedor")
 def api_generar():
     evento_id = session.get("evento_id")
     if not evento_id:
@@ -448,6 +508,7 @@ def api_generar():
                 "cedula": cedula,
                 "evento_id": evento_id,
                 "precio": precio,
+                "vendedor": session.get("usuario", ""),
             }).execute()
             if resp.data:
                 registrar_log("venta", f"{nombre} | cédula {cedula} | código {codigo}")
@@ -463,7 +524,7 @@ def api_generar():
 # API: validar entrada
 # -----------------------------------------------------------
 @app.route("/api/validar", methods=["POST"])
-@require_rol("portero", "admin")
+@require_rol("portero")
 def api_validar():
     evento_id = session.get("evento_id")
     if not evento_id:
@@ -505,7 +566,7 @@ def api_validar():
 # API: contador de entradas generadas
 # -----------------------------------------------------------
 @app.route("/api/contador")
-@require_rol("vendedor", "portero", "admin")
+@require_rol("vendedor", "portero")
 def api_contador():
     evento_id = session.get("evento_id")
     if not evento_id:
@@ -522,7 +583,7 @@ def api_contador():
 # API: centro de datos (stats)
 # -----------------------------------------------------------
 @app.route("/api/stats")
-@require_rol("vendedor", "portero", "admin")
+@require_rol("vendedor", "portero")
 def api_stats():
     evento_id = session.get("evento_id")
     precio = session.get("precio_entrada", 0)
@@ -559,14 +620,14 @@ def api_stats():
 
 
 @app.route("/api/listar")
-@require_rol("vendedor", "portero", "admin")
+@require_rol("vendedor", "portero")
 def api_listar():
     evento_id = session.get("evento_id")
     if not evento_id:
         return jsonify({"entradas": []})
     try:
         resp = supabase.table(TABLA).select(
-            "id,codigo,usado,creado_en,nombre,cedula,precio"
+            "id,codigo,usado,creado_en,nombre,cedula,precio,vendedor"
         ).eq("evento_id", evento_id).order("id", desc=True).limit(500).execute()
         return jsonify({"entradas": resp.data})
     except Exception as e:
@@ -574,7 +635,7 @@ def api_listar():
 
 
 @app.route("/api/reset", methods=["POST"])
-@require_rol("vendedor", "portero", "admin")
+@require_rol("vendedor", "portero")
 def api_reset():
     evento_id = session.get("evento_id")
     if not evento_id:
@@ -596,7 +657,7 @@ def api_reset():
 
 
 @app.route("/api/borrar_todas", methods=["POST"])
-@require_rol("vendedor", "portero", "admin")
+@require_rol("vendedor", "portero")
 def api_borrar_todas():
     evento_id = session.get("evento_id")
     if not evento_id:
@@ -614,7 +675,7 @@ def api_borrar_todas():
 
 
 @app.route("/api/exportar")
-@require_rol("vendedor", "portero", "admin")
+@require_rol("vendedor", "portero")
 def api_exportar():
     evento_id = session.get("evento_id")
     if not evento_id:
@@ -622,7 +683,7 @@ def api_exportar():
 
     try:
         resp = supabase.table(TABLA).select(
-            "id,codigo,usado,creado_en,nombre,cedula,precio"
+            "id,codigo,usado,creado_en,nombre,cedula,precio,vendedor"
         ).eq("evento_id", evento_id).order("id").execute()
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -646,11 +707,12 @@ def api_exportar():
     writer.writerow(["recaudado_usadas", usadas * precio])
     writer.writerow(["recaudado_pendientes", pendientes * precio])
     writer.writerow([])
-    writer.writerow(["id", "codigo", "nombre", "cedula", "usado", "precio", "creado_en"])
+    writer.writerow(["id", "codigo", "nombre", "cedula", "usado", "precio", "vendedor", "creado_en"])
     for row in resp.data:
         writer.writerow([row["id"], row["codigo"], row.get("nombre", ""),
                          row.get("cedula", ""), row["usado"],
-                         row.get("precio", precio), row["creado_en"]])
+                         row.get("precio", precio), row.get("vendedor", ""),
+                         row["creado_en"]])
 
     response = Response(output.getvalue(), mimetype="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=entradas.csv"
@@ -658,19 +720,66 @@ def api_exportar():
 
 
 # -----------------------------------------------------------
-# API: admin — eventos, logs y usuarios
+# API: admin — dashboard, eventos, logs, usuarios y asignaciones
 # -----------------------------------------------------------
+@app.route("/api/dashboard")
+@require_rol("admin")
+def api_dashboard():
+    """Estadisticas generales y por evento (incluye desglose por vendedor)."""
+    try:
+        eventos = supabase.table(TABLA_EVENTOS).select(
+            "id,nombre,precio_entrada,activo").order("id").execute().data
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    general = {"eventos": len(eventos), "total": 0, "usadas": 0,
+               "recaudado_total": 0, "recaudado_usadas": 0}
+    por_evento = []
+
+    for ev in eventos:
+        eid = ev["id"]
+        precio = ev["precio_entrada"]
+        total = supabase.table(TABLA).select("id", count="exact") \
+            .eq("evento_id", eid).execute().count
+        usadas = supabase.table(TABLA).select("id", count="exact") \
+            .eq("evento_id", eid).eq("usado", True).execute().count
+
+        por_vendedor = {}
+        try:
+            rows = supabase.table(TABLA).select("vendedor,usado") \
+                .eq("evento_id", eid).execute().data
+            for r in rows:
+                v = r.get("vendedor") or "—"
+                por_vendedor.setdefault(v, {"total": 0, "usadas": 0})
+                por_vendedor[v]["total"] += 1
+                if r["usado"]:
+                    por_vendedor[v]["usadas"] += 1
+        except Exception:
+            pass
+
+        por_evento.append({
+            "id": eid, "nombre": ev["nombre"], "precio_entrada": precio,
+            "activo": ev["activo"],
+            "total": total, "usadas": usadas, "pendientes": total - usadas,
+            "recaudado_total": total * precio,
+            "recaudado_usadas": usadas * precio,
+            "por_vendedor": por_vendedor,
+        })
+        general["total"] += total
+        general["usadas"] += usadas
+        general["recaudado_total"] += total * precio
+        general["recaudado_usadas"] += usadas * precio
+
+    return jsonify({"general": general, "por_evento": por_evento})
+
+
 @app.route("/api/logs")
 @require_rol("admin")
 def api_logs():
-    evento_id = session.get("evento_id")
     try:
-        query = supabase.table(TABLA_LOGS).select(
-            "id,accion,detalle,usuario,creado_en"
-        )
-        if evento_id:
-            query = query.or_(f"evento_id.eq.{evento_id},evento_id.is.null")
-        resp = query.order("id", desc=True).limit(300).execute()
+        resp = supabase.table(TABLA_LOGS).select(
+            "id,accion,detalle,usuario,creado_en,evento_id"
+        ).order("id", desc=True).limit(300).execute()
         return jsonify({"logs": resp.data})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -679,15 +788,23 @@ def api_logs():
 @app.route("/api/users")
 @require_rol("admin")
 def api_users_listar():
-    evento_id = session.get("evento_id")
     try:
-        query = supabase.table(TABLA_USERS).select(
-            "id,usuario,rol,nombre,evento_id"
-        )
-        if evento_id:
-            query = query.or_(f"evento_id.eq.{evento_id},evento_id.is.null")
-        resp = query.order("id").execute()
-        return jsonify({"users": resp.data})
+        users = supabase.table(TABLA_USERS).select(
+            "id,usuario,rol,nombre,creado_en").order("id").execute().data
+        asig = supabase.table(TABLA_ASIGNACIONES).select(
+            "usuario_id,evento_id,rol,eventos(nombre)").execute().data
+        eventos_nombre = {a["evento_id"]: (a.get("eventos") or {}).get("nombre", "")
+                          for a in asig}
+        por_usuario = {}
+        for a in asig:
+            por_usuario.setdefault(a["usuario_id"], []).append({
+                "evento_id": a["evento_id"],
+                "evento_nombre": eventos_nombre.get(a["evento_id"], ""),
+                "rol": a["rol"],
+            })
+        for u in users:
+            u["asignaciones"] = por_usuario.get(u["id"], [])
+        return jsonify({"users": users})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -695,22 +812,15 @@ def api_users_listar():
 @app.route("/api/users", methods=["POST"])
 @require_rol("admin")
 def api_users_crear():
-    evento_id = session.get("evento_id")
     data = request.get_json(silent=True) or {}
     usuario = (data.get("usuario") or "").strip().lower()
     password = data.get("password") or ""
-    rol = data.get("rol") or ""
+    admin = bool(data.get("admin"))
     nombre = (data.get("nombre") or "").strip()[:60]
 
-    if not usuario or not password or rol not in ("vendedor", "portero", "admin"):
-        return jsonify({"ok": False, "error": "usuario, password y rol son requeridos"}), 400
+    if not usuario or not password:
+        return jsonify({"ok": False, "error": "usuario y password son requeridos"}), 400
 
-    # Admin global: evento_id = NULL. Vendedor/portero: requiere evento.
-    user_evento_id = None if rol == "admin" else evento_id
-    if rol != "admin" and not evento_id:
-        return jsonify({"ok": False, "error": "Seleccioná un evento para este usuario"}), 400
-
-    # Check duplicate (login busca por usuario globalmente, así que debe ser único global)
     existe = supabase.table(TABLA_USERS).select("id") \
         .eq("usuario", usuario).execute()
     if existe.data:
@@ -719,18 +829,16 @@ def api_users_crear():
     supabase.table(TABLA_USERS).insert({
         "usuario": usuario,
         "password_hash": generate_password_hash(password),
-        "rol": rol,
+        "rol": "admin" if admin else None,
         "nombre": nombre,
-        "evento_id": user_evento_id,
     }).execute()
-    registrar_log("user_crear", f"{nombre} ({usuario}, {rol})")
+    registrar_log("user_crear", f"{nombre} ({usuario}, {'admin' if admin else 'staff'})")
     return jsonify({"ok": True})
 
 
 @app.route("/api/users/<int:user_id>", methods=["PUT"])
 @require_rol("admin")
 def api_users_editar(user_id):
-    evento_id = session.get("evento_id")
     data = request.get_json(silent=True) or {}
     cambios = {}
 
@@ -747,13 +855,8 @@ def api_users_editar(user_id):
     if "nombre" in data:
         cambios["nombre"] = (data.get("nombre") or "").strip()[:60]
 
-    if "rol" in data:
-        if data["rol"] not in ("vendedor", "portero", "admin"):
-            return jsonify({"ok": False, "error": "Rol inválido"}), 400
-        cambios["rol"] = data["rol"]
-
-    if "evento_id" in data:
-        cambios["evento_id"] = data["evento_id"] if data["evento_id"] else None
+    if "admin" in data:
+        cambios["rol"] = "admin" if data["admin"] else None
 
     if data.get("password"):
         cambios["password_hash"] = generate_password_hash(data["password"])
@@ -761,8 +864,7 @@ def api_users_editar(user_id):
     if not cambios:
         return jsonify({"ok": False, "error": "Nada que editar"}), 400
 
-    prev = supabase.table(TABLA_USERS).select("usuario,nombre,rol,evento_id") \
-        .eq("id", user_id).execute()
+    prev = supabase.table(TABLA_USERS).select("usuario,nombre,rol").eq("id", user_id).execute()
     if not prev.data:
         return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
 
@@ -783,11 +885,7 @@ def api_users_editar(user_id):
     if "nombre" in cambios:
         textos.append(f"nombre {antes.get('nombre', '') or '—'} → {cambios['nombre'] or '—'}")
     if "rol" in cambios:
-        textos.append(f"rol {antes['rol']} → {cambios['rol']}")
-    if "evento_id" in cambios:
-        e_nuevo = cambios['evento_id'] or 'NULL'
-        e_viejo = antes.get('evento_id') or 'NULL'
-        textos.append(f"evento {e_viejo} → {e_nuevo}")
+        textos.append(f"admin {antes['rol'] == 'admin'} → {cambios['rol'] == 'admin'}")
     if "password_hash" in cambios:
         textos.append("contraseña actualizada")
     registrar_log("user_editar", f"id {user_id} · {', '.join(textos)}")
@@ -806,7 +904,48 @@ def api_users_borrar(user_id):
 
     supabase.table(TABLA_USERS).delete().eq("id", user_id).execute()
     u = prev.data[0]
-    registrar_log("user_borrar", f"{u.get('nombre', '')} ({u['usuario']}, {u['rol']})")
+    registrar_log("user_borrar", f"{u.get('nombre', '')} ({u['usuario']})")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/asignar", methods=["POST"])
+@require_rol("admin")
+def api_asignar():
+    """Asigna un usuario a un evento con un rol (vendedor/portero)."""
+    data = request.get_json(silent=True) or {}
+    usuario_id = data.get("usuario_id")
+    evento_id = data.get("evento_id")
+    rol = data.get("rol")
+
+    if not usuario_id or not evento_id or rol not in ("vendedor", "portero"):
+        return jsonify({"ok": False, "error": "usuario_id, evento_id y rol (vendedor/portero) requeridos"}), 400
+
+    user = supabase.table(TABLA_USERS).select("usuario").eq("id", usuario_id).execute()
+    ev = supabase.table(TABLA_EVENTOS).select("nombre").eq("id", evento_id).execute()
+    if not user.data:
+        return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
+    if not ev.data:
+        return jsonify({"ok": False, "error": "Evento no encontrado"}), 404
+
+    supabase.table(TABLA_ASIGNACIONES).upsert(
+        {"usuario_id": usuario_id, "evento_id": evento_id, "rol": rol},
+        on_conflict="evento_id,usuario_id").execute()
+    registrar_log("user_asignar", f"{user.data[0]['usuario']} → {ev.data[0]['nombre']} ({rol})")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/asignar", methods=["DELETE"])
+@require_rol("admin")
+def api_desasignar():
+    data = request.get_json(silent=True) or {}
+    usuario_id = data.get("usuario_id")
+    evento_id = data.get("evento_id")
+    if not usuario_id or not evento_id:
+        return jsonify({"ok": False, "error": "usuario_id y evento_id requeridos"}), 400
+
+    supabase.table(TABLA_ASIGNACIONES).delete() \
+        .eq("usuario_id", usuario_id).eq("evento_id", evento_id).execute()
+    registrar_log("user_desasignar", f"usuario {usuario_id} quitado de evento {evento_id}")
     return jsonify({"ok": True})
 
 

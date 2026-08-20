@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}Admin - {{ nombre_evento }}{% endblock %}
+{% block titulo %}Admin - Panel{% endblock %}
 
 {% block estilos %}
 <style>
@@ -33,21 +33,46 @@
         border-radius: 999px;
     }
 
-    .filtro {
-        width: 100%;
-        padding: 10px 14px;
-        background: var(--negro);
-        border: 1px solid var(--linea);
-        border-radius: 10px;
-        color: var(--texto);
-        font-family: 'Space Mono', monospace;
-        font-size: 0.72rem;
-        margin-bottom: 12px;
-        outline: none;
+    /* ---------- Cards de stats generales ---------- */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
     }
 
-    .filtro:focus { border-color: var(--lima); }
+    .stat-card {
+        background: var(--negro);
+        border: 1px solid var(--linea);
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        transition: border-color 0.35s var(--cubic);
+    }
 
+    .stat-card:hover { border-color: rgba(217, 255, 61, 0.35); }
+
+    .stat-card .label {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.55rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+    }
+
+    .stat-card .valor {
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 1.5rem;
+        color: var(--lima);
+        line-height: 1;
+    }
+
+    .stat-card .valor.mono { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.25rem; }
+
+    .stat-card .detalle { font-family: 'Space Mono', monospace; font-size: 0.58rem; color: var(--texto-suave); }
+
+    /* ---------- Tablas ---------- */
     .tabla-wrap { overflow-x: auto; }
 
     table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
@@ -90,14 +115,18 @@
     .chip.escaneo { color: #7cc4ff; border-color: rgba(124, 196, 255, 0.4); }
     .chip.borrado_total { color: var(--rojo); border-color: rgba(255, 77, 77, 0.4); }
     .chip.login, .chip.logout { color: #c9a2ff; border-color: rgba(201, 162, 255, 0.4); }
-    .chip.user_crear, .chip.user_editar, .chip.user_borrar { color: #ffd166; border-color: rgba(255, 209, 102, 0.4); }
+    .chip.user_crear, .chip.user_editar, .chip.user_borrar,
+    .chip.user_asignar, .chip.user_desasignar { color: #ffd166; border-color: rgba(255, 209, 102, 0.4); }
     .chip.badge-pendiente { color: var(--rojo); border-color: rgba(255, 77, 77, 0.4); }
+    .chip.vendedor { color: var(--lima); border-color: rgba(217, 255, 61, 0.4); }
+    .chip.portero { color: #7cc4ff; border-color: rgba(124, 196, 255, 0.4); }
+    .chip.admin { color: #ffd166; border-color: rgba(255, 209, 102, 0.4); }
 
     .detalle { color: var(--texto-suave); font-size: 0.7rem; max-width: 260px; }
 
     .fecha { font-family: 'Space Mono', monospace; font-size: 0.62rem; color: var(--texto-suave); white-space: nowrap; }
 
-    .acciones { display: flex; gap: 6px; }
+    .acciones { display: flex; gap: 6px; flex-wrap: wrap; }
 
     .btn-mini {
         background: transparent;
@@ -116,17 +145,32 @@
     .btn-mini:hover { border-color: var(--lima); color: var(--lima); }
     .btn-mini.rojo:hover { border-color: var(--rojo); color: var(--rojo); }
 
-    .form-user {
-        display: flex;
-        flex-direction: column;
-        gap: 9px;
-        margin-bottom: 16px;
-        padding-bottom: 16px;
-        border-bottom: 1px solid var(--linea);
+    .filtro {
+        width: 100%;
+        padding: 10px 14px;
+        background: var(--negro);
+        border: 1px solid var(--linea);
+        border-radius: 10px;
+        color: var(--texto);
+        font-family: 'Space Mono', monospace;
+        font-size: 0.72rem;
+        margin-bottom: 12px;
+        outline: none;
     }
 
-    .form-user input, .form-user select {
-        width: 100%;
+    .filtro:focus { border-color: var(--lima); }
+
+    /* ---------- Formularios ---------- */
+    .form-row {
+        display: flex;
+        gap: 9px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+    }
+
+    .form-row input, .form-row select {
+        flex: 1;
+        min-width: 0;
         padding: 11px 14px;
         background: var(--negro);
         border: 1px solid var(--linea);
@@ -137,14 +181,56 @@
         outline: none;
     }
 
-    .form-user input:focus, .form-user select:focus { border-color: var(--lima); }
+    .form-row input:focus, .form-row select:focus { border-color: var(--lima); }
 
-    .form-user .fila { display: flex; gap: 9px; }
-    .form-user .fila input[type="text"], .form-user .fila input[type="password"] { flex: 1; }
-    .form-evento .fila input { flex: 1; }
+    .form-user { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--linea); }
+
+    .checkbox-admin {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.08em;
+        color: var(--texto-suave);
+        text-transform: uppercase;
+        padding: 11px 4px;
+        cursor: pointer;
+    }
+
+    .checkbox-admin input { accent-color: var(--lima); }
+
+    /* ---------- Asignaciones ---------- */
+    .asignacion-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 9px;
+        margin: 2px 4px 2px 0;
+        border-radius: 999px;
+        border: 1px solid var(--linea);
+        font-family: 'Space Mono', monospace;
+        font-size: 0.56rem;
+        letter-spacing: 0.05em;
+        color: var(--texto);
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    .asignacion-chip button {
+        background: none;
+        border: none;
+        color: var(--rojo);
+        cursor: pointer;
+        font-size: 0.72rem;
+        line-height: 1;
+        padding: 0;
+    }
+
+    .asignacion-chip button:hover { transform: scale(1.2); }
 
     .empty { text-align: center; color: var(--texto-suave); font-family: 'Space Mono', monospace; font-size: 0.68rem; padding: 18px 0; }
 
+    /* ---------- Modal ---------- */
     .modal-edit {
         background: var(--negro-2);
         border: 1px solid var(--linea);
@@ -191,8 +277,11 @@
 
     .modal-botones .btn-primario { padding: 10px 20px; font-size: 0.75rem; }
 
-    @media (max-width: 380px) {
-        .form-user .fila { flex-direction: column; }
+    .btn-primario.flex { width: auto; padding: 12px 18px; font-size: 0.75rem; }
+
+    @media (max-width: 420px) {
+        .stats-grid { grid-template-columns: 1fr; }
+        .form-row input, .form-row select { min-width: 100%; }
     }
 </style>
 {% endblock %}
@@ -200,51 +289,61 @@
 {% block content %}
 <div class="admin-grid">
     <section class="panel" style="animation-delay:0s">
-        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><path d="M12 11h-2a2 2 0 0 0-2 2v3h8v-3a2 2 0 0 0-2-2h-2z"/></svg> Eventos <span class="count" id="countEventos">0</span></h2>
+        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Resumen general</h2>
+        <div class="stats-grid">
+            <div class="stat-card"><span class="label">Entradas totales</span><span class="valor" id="stTotal">0</span><span class="detalle" id="stEventos">0 eventos</span></div>
+            <div class="stat-card"><span class="label">Usadas</span><span class="valor" id="stUsadas">0</span><span class="detalle">validadas en puerta</span></div>
+            <div class="stat-card"><span class="label">Recaudado total</span><span class="valor mono" id="stRecTotal">₡0</span><span class="detalle" id="stPend">0 pendientes</span></div>
+            <div class="stat-card"><span class="label">Recaudado usado</span><span class="valor mono" id="stRecUsadas">₡0</span><span class="detalle">efectivamente cobrado</span></div>
+        </div>
+    </section>
 
-        <form class="form-evento" id="formEvento">
-            <div class="fila">
-                <input type="text" id="eNombre" class="flex-1" placeholder="Nombre del evento" autocomplete="off" maxlength="100">
-                <input type="number" id="ePrecio" placeholder="Precio (₡)" min="0" step="1" autocomplete="off">
-                <button class="btn-primario" type="submit" style="padding:12px 18px;font-size:0.75rem">Crear evento</button>
-            </div>
+    <section class="panel" style="animation-delay:0.02s">
+        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h8"/><path d="M7 11h12"/><path d="M7 6h3"/></svg> Eventos <span class="count" id="countEventos">0</span></h2>
+
+        <form class="form-row" id="formEvento">
+            <input type="text" id="evNombre" placeholder="Nombre del evento" autocomplete="off" maxlength="100">
+            <input type="number" id="ePrecio" placeholder="Precio (₡)" min="0" step="1" autocomplete="off">
+            <button class="btn-primario flex" type="submit">Crear evento</button>
         </form>
 
         <div class="tabla-wrap">
             <table>
                 <thead>
-                    <tr><th>Evento</th><th>Precio</th><th>Estado</th><th>Activo</th><th></th></tr>
+                    <tr><th>Evento</th><th>Precio</th><th>Estado</th><th>Entradas</th><th></th></tr>
                 </thead>
                 <tbody id="eventosBody"></tbody>
             </table>
         </div>
     </section>
 
-    <section class="panel" style="animation-delay:0.03s">
-        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg> Usuarios <span class="count" id="countUsers">0</span></h2>
+    <section class="panel" style="animation-delay:0.04s">
+        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Usuarios <span class="count" id="countUsers">0</span></h2>
 
-        <form class="form-user" id="formUser">
-            <div class="fila">
+        <div class="form-user">
+            <form class="form-row" id="formUser">
                 <input type="text" id="uNombre" placeholder="Nombre (opcional)">
-            </div>
-            <div class="fila">
                 <input type="text" id="uUsuario" placeholder="Usuario" autocomplete="off">
                 <input type="password" id="uPassword" placeholder="Contraseña" autocomplete="new-password">
-            </div>
-            <div class="fila">
-                <select id="uRol">
+                <label class="checkbox-admin"><input type="checkbox" id="uAdmin"> Es administrador</label>
+                <button class="btn-primario flex" type="submit">Crear usuario</button>
+            </form>
+
+            <form class="form-row" id="formAsignar">
+                <select id="asignarUser"><option value="">Usuario…</option></select>
+                <select id="asignarEvento"><option value="">Evento…</option></select>
+                <select id="asignarRol">
                     <option value="vendedor">Vendedor</option>
                     <option value="portero">Portero</option>
-                    <option value="admin">Admin</option>
                 </select>
-                <button class="btn-primario" type="submit" style="padding:12px;font-size:0.8rem">Crear usuario</button>
-            </div>
-        </form>
+                <button class="btn-primario flex" type="submit">Asignar</button>
+            </form>
+        </div>
 
         <div class="tabla-wrap">
             <table>
                 <thead>
-                    <tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th></th></tr>
+                    <tr><th>Usuario</th><th>Nombre</th><th>Tipo</th><th>Asignado a</th><th></th></tr>
                 </thead>
                 <tbody id="usersBody"></tbody>
             </table>
@@ -270,11 +369,7 @@
         <h3><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg> Editar usuario</h3>
         <input type="text" id="eNombre" placeholder="Nombre">
         <input type="text" id="eUsuario" placeholder="Usuario" autocomplete="off">
-        <select id="eRol">
-            <option value="vendedor">Vendedor</option>
-            <option value="portero">Portero</option>
-            <option value="admin">Admin</option>
-        </select>
+        <label class="checkbox-admin"><input type="checkbox" id="eAdmin"> Es administrador</label>
         <input type="password" id="ePassword" placeholder="Contraseña (vacío = no cambiar)" autocomplete="new-password">
         <div class="modal-botones">
             <button type="button" class="btn-mini" id="btnCancelarEdit">Cancelar</button>
@@ -312,6 +407,8 @@
         'user_crear': 'Crear usuario',
         'user_editar': 'Editar usuario',
         'user_borrar': 'Borrar usuario',
+        'user_asignar': 'Asignar usuario',
+        'user_desasignar': 'Quitar asignación',
         'evento_crear': 'Crear evento',
         'evento_editar': 'Editar evento',
         'evento_borrar': 'Borrar evento',
@@ -321,6 +418,20 @@
     async function api(url, opciones = {}) {
         const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opciones });
         return r.json();
+    }
+
+    // ---------- Dashboard ----------
+    async function cargarDashboard() {
+        const data = await api('/api/dashboard');
+        if (!data.ok) return;
+        const g = data.general;
+        document.getElementById('stTotal').textContent = g.total;
+        document.getElementById('stUsadas').textContent = g.usadas;
+        document.getElementById('stRecTotal').textContent = '₡' + g.recaudado_total.toLocaleString('es-CR');
+        document.getElementById('stRecUsadas').textContent = '₡' + g.recaudado_usadas.toLocaleString('es-CR');
+        document.getElementById('stEventos').textContent = g.eventos + ' eventos';
+        document.getElementById('stPend').textContent = (g.total - g.usadas) + ' pendientes';
+        return data.por_evento || [];
     }
 
     // ---------- Eventos ----------
@@ -341,7 +452,7 @@
                 <td style="font-family:'Space Mono',monospace;font-size:0.7rem">${ev.nombre}</td>
                 <td><span class="chip">₡${ev.precio_entrada}</span></td>
                 <td><span class="chip ${ev.activo ? '' : 'badge-pendiente'}">${ev.activo ? 'Abierto' : 'Cerrado'}</span></td>
-                <td>${ev.id == {{ evento_id or 0 }} ? '<span class="chip">Activo</span>' : ''}</td>
+                <td class="fecha" data-ev-id="${ev.id}">—</td>
                 <td><div class="acciones">
                     <button class="btn-mini" data-edit-ev="${ev.id}">Editar</button>
                     <button class="btn-mini rojo" data-del-ev="${ev.id}">Borrar</button>
@@ -350,64 +461,44 @@
         }
     }
 
-    document.getElementById('formEvento').addEventListener('submit', async e => {
-        e.preventDefault();
-        const nombre = document.getElementById('eNombre').value.trim();
-        const precio = parseInt(document.getElementById('ePrecio').value) || 1000;
-        if (!nombre) { mostrarToast('Ingresá un nombre para el evento', 'error'); return; }
-        const data = await api('/api/eventos', {
-            method: 'POST',
-            body: JSON.stringify({ nombre, precio })
-        });
-        if (data.ok) {
-            document.getElementById('eNombre').value = '';
-            document.getElementById('ePrecio').value = '';
-            mostrarToast('Evento creado', 'ok');
-            cargarEventos(); cargarLogs();
-        } else {
-            mostrarToast(data.error || 'Error', 'error');
+    // ---------- Usuarios ----------
+    async function cargarUsers() {
+        const data = await api('/api/users');
+        document.getElementById('countUsers').textContent = data.users ? data.users.length : 0;
+        const body = document.getElementById('usersBody');
+        body.innerHTML = '';
+        for (const u of data.users || []) {
+            const esAdmin = u.rol === 'admin';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${u.usuario}</td>
+                <td class="detalle" style="max-width:140px"></td>
+                <td><span class="chip ${esAdmin ? 'admin' : ''}">${esAdmin ? 'Admin' : 'Staff'}</span></td>
+                <td class="acciones-asig" style="max-width:200px"></td>
+                <td><div class="acciones">
+                    <button class="btn-mini" data-edit="${u.id}">Editar</button>
+                    <button class="btn-mini rojo" data-del="${u.id}">Borrar</button>
+                </div></td>`;
+            tr.querySelector('.detalle').textContent = u.nombre || '';
+            const celdaAsig = tr.querySelector('.acciones-asig');
+            if (!u.asignaciones || !u.asignaciones.length) {
+                celdaAsig.innerHTML = '<span class="detalle">Sin asignar</span>';
+            } else {
+                for (const a of u.asignaciones) {
+                    const chip = document.createElement('span');
+                    chip.className = 'asignacion-chip';
+                    chip.innerHTML = `<span class="chip ${a.rol}">${a.rol}</span> <span></span> <button data-desasig="${u.id}" data-ev="${a.evento_id}" title="Quitar">✕</button>`;
+                    chip.querySelector('span:nth-child(2)').textContent = a.evento_nombre;
+                    celdaAsig.appendChild(chip);
+                }
+            }
+            body.appendChild(tr);
         }
-    });
+    }
 
-    const modalEvento = document.getElementById('modalEvento');
-
-    document.getElementById('eventosBody').addEventListener('click', async e => {
-        const btn = e.target.closest('button[data-edit-ev], button[data-del-ev]');
-        if (!btn) return;
-        const id = parseInt(btn.dataset.editEv || btn.dataset.delEv);
-        if (btn.dataset.delEv) {
-            if (!confirm('¿Borrar el evento "' + btn.closest('tr').children[0].textContent + '"? Se borrarán sus entradas y usuarios.')) return;
-            const data = await api(`/api/eventos/${id}`, { method: 'DELETE' });
-            if (data.ok) { mostrarToast('Evento borrado', 'ok'); cargarEventos(); }
-            else mostrarToast(data.error || 'Error', 'error');
-            return;
-        }
-        editandoEventoId = id;
-        const row = btn.closest('tr');
-        document.getElementById('eeNombre').value = row.children[0].textContent;
-        document.getElementById('eePrecio').value = row.children[1].textContent.replace(/[^0-9]/g, '');
-        document.getElementById('eeActivo').checked = row.children[3].textContent !== '';
-        modalEvento.showModal();
-        document.getElementById('eeNombre').focus();
-    });
-
-    document.getElementById('formEventoEdit').addEventListener('submit', async e => {
-        e.preventDefault();
-        const body = {
-            nombre: document.getElementById('eeNombre').value.trim(),
-            precio_entrada: parseInt(document.getElementById('eePrecio').value) || 0,
-            activo: document.getElementById('eeActivo').checked
-        };
-        const data = await api(`/api/eventos/${editandoEventoId}`, { method: 'PUT', body: JSON.stringify(body) });
-        modalEvento.close();
-        if (data.ok) { mostrarToast('Evento actualizado', 'ok'); cargarEventos(); }
-        else mostrarToast(data.error || 'Error', 'error');
-    });
-
-    document.getElementById('btnCancelarEvento').addEventListener('click', () => modalEvento.close());
-
+    // ---------- Logs ----------
     function chipClase(accion) {
-        if (['user_crear', 'user_editar', 'user_borrar'].includes(accion)) return 'user_crear';
+        if (['user_crear', 'user_editar', 'user_borrar', 'user_asignar', 'user_desasignar'].includes(accion)) return 'user_crear';
         return accion;
     }
 
@@ -446,26 +537,65 @@
         }
     }
 
-    async function cargarUsers() {
-        const data = await api('/api/users');
-        document.getElementById('countUsers').textContent = data.users ? data.users.length : 0;
-        const body = document.getElementById('usersBody');
-        body.innerHTML = '';
-        for (const u of data.users || []) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${u.usuario}</td>
-                <td class="detalle" style="max-width:140px"></td>
-                <td><span class="chip ${u.rol === 'admin' ? 'user_crear' : u.rol}">${u.rol}</span></td>
-                <td><div class="acciones">
-                    <button class="btn-mini" data-edit="${u.id}">Editar</button>
-                    <button class="btn-mini rojo" data-del="${u.id}">Borrar</button>
-                </div></td>`;
-            tr.querySelector('.detalle').textContent = u.nombre || '';
-            body.appendChild(tr);
+    // ---------- Eventos: crear / editar / borrar ----------
+    document.getElementById('formEvento').addEventListener('submit', async e => {
+        e.preventDefault();
+        const nombre = document.getElementById('evNombre').value.trim();
+        const precio = parseInt(document.getElementById('ePrecio').value) || 1000;
+        if (!nombre) { mostrarToast('Ingresá un nombre para el evento', 'error'); return; }
+        const data = await api('/api/eventos', {
+            method: 'POST',
+            body: JSON.stringify({ nombre, precio })
+        });
+        if (data.ok) {
+            document.getElementById('evNombre').value = '';
+            document.getElementById('ePrecio').value = '';
+            mostrarToast('Evento creado', 'ok');
+            cargarEventos(); cargarDashboard(); cargarLogs();
+            cargarSelectores();
+        } else {
+            mostrarToast(data.error || 'Error', 'error');
         }
-    }
+    });
 
+    const modalEvento = document.getElementById('modalEvento');
+
+    document.getElementById('eventosBody').addEventListener('click', async e => {
+        const btn = e.target.closest('button[data-edit-ev], button[data-del-ev]');
+        if (!btn) return;
+        const id = parseInt(btn.dataset.editEv || btn.dataset.delEv);
+        if (btn.dataset.delEv) {
+            if (!confirm('¿Borrar el evento "' + btn.closest('tr').children[0].textContent + '"? Se borrarán sus entradas, logs y asignaciones.')) return;
+            const data = await api(`/api/eventos/${id}`, { method: 'DELETE' });
+            if (data.ok) { mostrarToast('Evento borrado', 'ok'); cargarEventos(); cargarUsers(); cargarDashboard(); cargarLogs(); cargarSelectores(); }
+            else mostrarToast(data.error || 'Error', 'error');
+            return;
+        }
+        editandoEventoId = id;
+        const row = btn.closest('tr');
+        document.getElementById('eeNombre').value = row.children[0].textContent;
+        document.getElementById('eePrecio').value = row.children[1].textContent.replace(/[^0-9]/g, '');
+        document.getElementById('eeActivo').checked = row.children[2].textContent.includes('Abierto');
+        modalEvento.showModal();
+        document.getElementById('eeNombre').focus();
+    });
+
+    document.getElementById('formEventoEdit').addEventListener('submit', async e => {
+        e.preventDefault();
+        const body = {
+            nombre: document.getElementById('eeNombre').value.trim(),
+            precio_entrada: parseInt(document.getElementById('eePrecio').value) || 0,
+            activo: document.getElementById('eeActivo').checked
+        };
+        const data = await api(`/api/eventos/${editandoEventoId}`, { method: 'PUT', body: JSON.stringify(body) });
+        modalEvento.close();
+        if (data.ok) { mostrarToast('Evento actualizado', 'ok'); cargarEventos(); cargarDashboard(); cargarLogs(); }
+        else mostrarToast(data.error || 'Error', 'error');
+    });
+
+    document.getElementById('btnCancelarEvento').addEventListener('click', () => modalEvento.close());
+
+    // ---------- Usuarios: crear / asignar / editar / borrar ----------
     document.getElementById('formUser').addEventListener('submit', async e => {
         e.preventDefault();
         const data = await api('/api/users', {
@@ -473,32 +603,76 @@
             body: JSON.stringify({
                 usuario: document.getElementById('uUsuario').value,
                 password: document.getElementById('uPassword').value,
-                rol: document.getElementById('uRol').value,
+                admin: document.getElementById('uAdmin').checked,
                 nombre: document.getElementById('uNombre').value
             })
         });
         if (data.ok) {
-            document.getElementById('uUsuario').value = '';
-            document.getElementById('uPassword').value = '';
-            document.getElementById('uNombre').value = '';
+            ['uUsuario', 'uPassword', 'uNombre'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('uAdmin').checked = false;
             mostrarToast('Usuario creado', 'ok');
+            cargarUsers(); cargarLogs(); cargarSelectores();
+        } else {
+            mostrarToast(data.error || 'Error', 'error');
+        }
+    });
+
+    async function cargarSelectores() {
+        const [users, eventos] = await Promise.all([api('/api/users'), api('/api/eventos')]);
+        const selU = document.getElementById('asignarUser');
+        const selE = document.getElementById('asignarEvento');
+        selU.innerHTML = '<option value="">Usuario…</option>';
+        selE.innerHTML = '<option value="">Evento…</option>';
+        (users.users || []).forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u.id;
+            opt.textContent = u.usuario;
+            selU.appendChild(opt);
+        });
+        (eventos.eventos || []).forEach(ev => {
+            const opt = document.createElement('option');
+            opt.value = ev.id;
+            opt.textContent = ev.nombre;
+            selE.appendChild(opt);
+        });
+    }
+
+    document.getElementById('formAsignar').addEventListener('submit', async e => {
+        e.preventDefault();
+        const usuario_id = document.getElementById('asignarUser').value;
+        const evento_id = document.getElementById('asignarEvento').value;
+        const rol = document.getElementById('asignarRol').value;
+        if (!usuario_id || !evento_id) { mostrarToast('Elegí usuario y evento', 'error'); return; }
+        const data = await api('/api/asignar', {
+            method: 'POST',
+            body: JSON.stringify({ usuario_id: parseInt(usuario_id), evento_id: parseInt(evento_id), rol })
+        });
+        if (data.ok) {
+            mostrarToast('Usuario asignado', 'ok');
             cargarUsers(); cargarLogs();
         } else {
             mostrarToast(data.error || 'Error', 'error');
         }
     });
 
-    let editandoId = null;
-    const modalEdit = document.getElementById('modalEdit');
-
     document.getElementById('usersBody').addEventListener('click', async e => {
+        const btnDes = e.target.closest('button[data-desasig]');
+        if (btnDes) {
+            const data = await api('/api/asignar', {
+                method: 'DELETE',
+                body: JSON.stringify({ usuario_id: parseInt(btnDes.dataset.desasig), evento_id: parseInt(btnDes.dataset.ev) })
+            });
+            if (data.ok) { mostrarToast('Asignación quitada', 'ok'); cargarUsers(); cargarLogs(); }
+            else mostrarToast(data.error || 'Error', 'error');
+            return;
+        }
         const btn = e.target.closest('button[data-edit], button[data-del]');
         if (!btn) return;
         const id = btn.dataset.edit || btn.dataset.del;
         if (btn.dataset.del) {
             if (!confirm('¿Borrar este usuario?')) return;
             const data = await api(`/api/users/${id}`, { method: 'DELETE' });
-            if (data.ok) { mostrarToast('Usuario borrado', 'ok'); cargarUsers(); cargarLogs(); }
+            if (data.ok) { mostrarToast('Usuario borrado', 'ok'); cargarUsers(); cargarLogs(); cargarSelectores(); }
             else mostrarToast(data.error || 'Error', 'error');
             return;
         }
@@ -506,18 +680,21 @@
         const celdas = btn.closest('tr').children;
         document.getElementById('eNombre').value = celdas[1].textContent;
         document.getElementById('eUsuario').value = celdas[0].textContent.trim();
-        document.getElementById('eRol').value = celdas[2].textContent;
+        document.getElementById('eAdmin').checked = celdas[2].textContent.includes('Admin');
         document.getElementById('ePassword').value = '';
         modalEdit.showModal();
         document.getElementById('eNombre').focus();
     });
+
+    let editandoId = null;
+    const modalEdit = document.getElementById('modalEdit');
 
     document.getElementById('formEdit').addEventListener('submit', async e => {
         e.preventDefault();
         const body = {
             usuario: document.getElementById('eUsuario').value,
             nombre: document.getElementById('eNombre').value,
-            rol: document.getElementById('eRol').value
+            admin: document.getElementById('eAdmin').checked
         };
         const pass = document.getElementById('ePassword').value;
         if (pass.trim()) body.password = pass.trim();
@@ -531,9 +708,18 @@
 
     document.getElementById('filtroLogs').addEventListener('input', cargarLogs);
 
-    cargarEventos();
-    cargarLogs();
-    cargarUsers();
+    // ---------- Init ----------
+    async function init() {
+        await Promise.all([cargarDashboard(), cargarEventos(), cargarUsers(), cargarLogs(), cargarSelectores()]);
+        const porEvento = await cargarDashboard();
+        const celdas = document.querySelectorAll('#eventosBody td[data-ev-id]');
+        celdas.forEach(cd => {
+            const ev = (porEvento || []).find(x => x.id === parseInt(cd.dataset.evId));
+            if (ev) cd.textContent = ev.total + ' · ' + ev.usadas + ' usadas';
+        });
+    }
+
+    init();
     setInterval(cargarLogs, 15000);
 </script>
 {% endblock %}

@@ -99,31 +99,7 @@
             margin-top: 3px;
         }
 
-        .evento-selector {
-            flex: 1;
-            max-width: 200px;
-        }
-
-        .evento-selector .selector {
-            width: 100%;
-            padding: 8px 12px;
-            background: var(--negro);
-            border: 1px solid var(--linea);
-            border-radius: 999px;
-            color: var(--texto);
-            font-family: 'Space Mono', monospace;
-            font-size: 0.68rem;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-            outline: none;
-            cursor: pointer;
-            transition: all 0.35s var(--cubic);
-        }
-
-        .evento-selector .selector:focus {
-            border-color: var(--lima);
-            background: rgba(217, 255, 61, 0.05);
-        }
+        .header-acciones { display: flex; align-items: center; gap: 8px; }
 
         .btn-logout {
             background: transparent;
@@ -311,14 +287,12 @@
                 <div class="subtitulo">Sistema de Entradas</div>
             </div>
         </div>
-        {% if rol == 'admin' %}
-        <div class="evento-selector" id="eventoSelector">
-            <select class="selector" id="eventoSelect" data-current="{{ evento_id or '' }}">
-                <option value="">Seleccionar evento…</option>
-            </select>
+        <div class="header-acciones">
+            {% if multi_evento %}
+            <button class="btn-logout" id="btnCambiarEvento" title="Cambiar de evento">Cambiar</button>
+            {% endif %}
+            <button class="btn-logout" id="btnLogout">Salir</button>
         </div>
-        {% endif %}
-        <button class="btn-logout" id="btnLogout">Salir</button>
     </header>
     {% endif %}
 
@@ -332,13 +306,14 @@
 
     {% if request.path != '/login' %}
     <nav class="tabbar">
-        {% if rol in ('vendedor', 'admin') %}
+        {% if rol == 'vendedor' %}
         <a href="/vendedor" class="{{ 'activo' if request.path in ['/vendedor', '/'] else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 1792 1792" fill="currentColor"><path d="M1024 452l316 316-572 572-316-316zm-211 979l618-618q19-19 19-45t-19-45l-362-362q-18-18-45-18t-45 18l-618 618q-19 19-19 45t19 45l362 362q18 18 45 18t45-18zm889-637l-907 908q-37 37-90.5 37t-90.5-37l-126-126q56-56 56-136t-56-136-136-56-136 56l-125-126q-37-37-37-90.5t37-90.5l907-906q37-37 90.5-37t90.5 37l125 125q-56 56-56 136t56 136 136 56 136-56l126 125q37 37 37 90.5t-37 90.5z"/></svg></span>Vendedor</a>
-        {% endif %}
-        {% if rol in ('portero', 'admin') %}
-        <a href="/portero" class="{{ 'activo' if request.path == '/portero' else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></span>Portero</a>
-        {% endif %}
         <a href="/centro" class="{{ 'activo' if request.path == '/centro' else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h8"/><path d="M7 11h12"/><path d="M7 6h3"/></svg></span>Centro</a>
+        {% endif %}
+        {% if rol == 'portero' %}
+        <a href="/portero" class="{{ 'activo' if request.path == '/portero' else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg></span>Portero</a>
+        <a href="/centro" class="{{ 'activo' if request.path == '/centro' else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h8"/><path d="M7 11h12"/><path d="M7 6h3"/></svg></span>Centro</a>
+        {% endif %}
         {% if rol == 'admin' %}
         <a href="/admin" class="{{ 'activo' if request.path == '/admin' else '' }}"><span class="ico"><svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg></span>Admin</a>
         {% endif %}
@@ -360,39 +335,10 @@
             location.href = '/login';
         });
 
-        {% if rol == 'admin' %}
-        async function cargarEventos() {
-            const select = document.getElementById('eventoSelect');
-            const currentId = select.dataset.current;
-            try {
-                const res = await fetch('/api/eventos');
-                const data = await res.json();
-                select.innerHTML = '<option value="">Seleccionar evento…</option>';
-                (data.eventos || []).forEach(ev => {
-                    const opt = document.createElement('option');
-                    opt.value = ev.id;
-                    opt.textContent = ev.nombre + ' (₡' + ev.precio_entrada + ')';
-                    if (String(ev.id) === currentId) opt.selected = true;
-                    select.appendChild(opt);
-                });
-                document.getElementById('eventoSelector').style.display = 'block';
-            } catch (e) {
-                console.error('Error al cargar eventos:', e);
-            }
-        }
-
-        document.getElementById('eventoSelect').addEventListener('change', async function() {
-            const id = this.value;
-            if (!id) return;
-            await fetch('/api/evento/select', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ evento_id: parseInt(id) })
-            });
-            location.reload();
+        {% if multi_evento %}
+        document.getElementById('btnCambiarEvento').addEventListener('click', () => {
+            location.href = '/elegir';
         });
-
-        cargarEventos();
         {% endif %}
     </script>
     {% endif %}

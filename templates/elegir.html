@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block titulo %}Elegir evento{% endblock %}
+
+{% block estilos %}
+<style>
+    .elegir-wrap {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .elegir-titulo {
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 0.9rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        text-align: center;
+    }
+
+    .elegir-sub {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.16em;
+        color: var(--texto-suave);
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    .evento-card {
+        width: 100%;
+        max-width: 340px;
+        background: var(--negro-2);
+        border: 1px solid var(--linea);
+        border-radius: 16px;
+        padding: 16px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        cursor: pointer;
+        transition: all 0.35s var(--cubic);
+        animation: pop 0.45s var(--cubic) both;
+    }
+
+    .evento-card:hover { border-color: var(--lima); transform: translateY(-2px); }
+
+    .evento-card .info { min-width: 0; }
+
+    .evento-card .nombre {
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 0.82rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .evento-card .meta {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.6rem;
+        letter-spacing: 0.1em;
+        color: var(--texto-suave);
+        margin-top: 4px;
+    }
+
+    .evento-card .rol {
+        flex-shrink: 0;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.58rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--lima);
+        background: var(--lima-suave);
+        border: 1px solid rgba(217, 255, 61, 0.4);
+        padding: 5px 12px;
+        border-radius: 999px;
+    }
+
+    .elegir-loading { color: var(--texto-suave); font-family: 'Space Mono', monospace; font-size: 0.7rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="elegir-wrap">
+    <div class="elegir-titulo">¿A qué evento entrás?</div>
+    <div class="elegir-sub">Elegí uno de tus eventos asignados</div>
+    <div id="listaEventos" class="elegir-loading">Cargando eventos…</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function cargarMisEventos() {
+        try {
+            const res = await fetch('/api/mis_eventos');
+            if (res.status === 401) { location.href = '/login'; return; }
+            const data = await res.json();
+            const cont = document.getElementById('listaEventos');
+            if (!data.ok) { mostrarToast(data.error || 'Error', 'error'); return; }
+            if (!data.eventos.length) {
+                cont.innerHTML = '<div class="elegir-loading">No tenés eventos asignados</div>';
+                return;
+            }
+            cont.innerHTML = '';
+            cont.className = '';
+            cont.style.display = 'flex';
+            cont.style.flexDirection = 'column';
+            cont.style.gap = '10px';
+            cont.style.width = '100%';
+            cont.style.maxWidth = '340px';
+            cont.style.alignItems = 'center';
+            for (const ev of data.eventos) {
+                const card = document.createElement('div');
+                card.className = 'evento-card';
+                card.innerHTML = `
+                    <div class="info">
+                        <div class="nombre"></div>
+                        <div class="meta">₡${ev.precio_entrada} · entrada</div>
+                    </div>
+                    <span class="rol">${ev.rol}</span>`;
+                card.querySelector('.nombre').textContent = ev.nombre;
+                card.addEventListener('click', async () => {
+                    card.style.opacity = '0.5';
+                    card.style.pointerEvents = 'none';
+                    const r = await fetch('/api/evento/select', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ evento_id: ev.evento_id })
+                    });
+                    const d = await r.json();
+                    if (r.status === 401) { location.href = '/login'; return; }
+                    if (d.ok && d.destino) { location.href = d.destino; }
+                    else { mostrarToast(d.error || 'Error', 'error'); card.style.opacity = '1'; card.style.pointerEvents = 'auto'; }
+                });
+                cont.appendChild(card);
+            }
+        } catch (e) {
+            document.getElementById('listaEventos').textContent = 'Error de conexión';
+        }
+    }
+
+    cargarMisEventos();
+</script>
+{% endblock %}
