@@ -368,7 +368,7 @@
     </main>
 
     <div class="footer">
-        <span class="evento">{{ nombre_evento }}</span> &middot; Taquilla Digital
+        {% if nombre_evento %}<span class="evento">{{ nombre_evento }}</span> &middot; {% endif %}Taquilla Digital
     </div>
 
     {% if request.path != '/login' and rol in ['vendedor', 'portero'] %}
