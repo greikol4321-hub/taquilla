@@ -733,7 +733,7 @@
                             <button data-modo="colegio">Por colegio</button>
                             <button data-modo="dinero">Vendido ₡</button>
                         </div>
-                        <div id="chartEventos"></div>
+                        <div id="chartWrap" style="position:relative; min-height: 120px;"><canvas id="chartEventos" height="140"></canvas></div>
                         {% else %}
                         <p class="chart-titulo">Entradas por evento</p>
                         <div id="chartEventos"></div>
@@ -1023,6 +1023,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
     const ACCIONES = {
         'venta': 'Venta',
@@ -1148,54 +1149,124 @@
         }
     }
 
-    // Gráfica con selector: Por evento / Por colegio / Vendido ₡
+    // Gráfica con selector: Por evento / Por colegio / Vendido ₡  — Chart.js (gratis, CDN) + fallback CSS
     let modoGrafica = 'evento';
+    let chartCmp = null;
     function pintarComparativa(porEvento, porColegio, modo) {
         modoGrafica = modo || modoGrafica;
-        const wrap = document.getElementById('chartEventos');
-        wrap.innerHTML = '';
+        const canvas = document.getElementById('chartEventos');
+        if (!canvas) return;
 
-        // Mapa de colores por colegio_id (null = 'g' = global)
+        // Fallback CSS si Chart.js no cargó (offline)
         const colores = { g: '#d9ff3d' };
-        for (const c of porColegio || []) {
-            colores[c.colegio_id ?? 'g'] = c.color || '#8a8f98';
-        }
+        for (const c of porColegio || []) colores[c.colegio_id ?? 'g'] = c.color || '#8a8f98';
 
-        let items = [];
-        let getLabel, getValue, getSub, maxVal = 1;
-
-        if (modoGrafica === 'evento') {
-            items = porEvento || [];
-            maxVal = Math.max(...items.map(e => e.total), 1);
-            getLabel = e => e.nombre;
-            getValue = e => `${e.usadas}/${e.total}`;
-            getSub = e => `${e.total ? Math.round(e.usadas / e.total * 100) : 0}% asistencia`;
-            // color por evento: usa colegio_color del evento
-            for (const e of items) {
-                e._barColor = e.colegio_color || colores.g;
-            }
-        } else if (modoGrafica === 'colegio') {
-            items = porColegio || [];
-            maxVal = Math.max(...items.map(c => c.total), 1);
-            getLabel = c => c.nombre;
-            getValue = c => c.total;
-            getSub = c => `${c.total ? Math.round(c.usadas / c.total * 100) : 0}% asistencia · ${c.eventos} ev.`;
-            for (const c of items) c._barColor = c.color || '#8a8f98';
-        } else { // 'dinero'
-            items = [...(porColegio || [])].sort((a, b) => b.recaudado_total - a.recaudado_total);
-            maxVal = Math.max(...items.map(c => c.recaudado_total), 1);
-            getLabel = c => c.nombre;
-            getValue = c => '₡' + c.recaudado_total.toLocaleString('es-CR');
-            getSub = c => `${c.total} vendidas · ${c.total ? Math.round(c.usadas / c.total * 100) : 0}% asistencia`;
-            for (const c of items) c._barColor = c.color || '#8a8f98';
-        }
-
-        if (!items.length) {
-            wrap.innerHTML = '<p class="empty">Sin datos</p>';
+        if (typeof Chart === 'undefined') {
+            // Chart.js aún cargando por CDN — reintentar en 300ms
+            setTimeout(() => pintarComparativa(porEvento, porColegio, modo), 300);
             return;
         }
 
-        for (const it of items) {
+        let labels = [], data = [], bg = [], max = 100, fmt = v => v;
+        if (modoGrafica === 'evento') {
+            const items = porEvento || [];
+            labels = items.map(e => e.nombre);
+            data = items.map(e => e.total ? Math.round(e.usadas / e.total * 100) : 0);
+            bg = items.map(e => e.colegio_color || colores.g);
+            max = 100;
+            fmt = (v, i) => `${items[i].usadas}/${items[i].total} · ${v}%`;
+        } else if (modoGrafica === 'colegio') {
+            const items = porColegio || [];
+            labels = items.map(c => c.nombre);
+            data = items.map(c => c.total ? Math.round(c.usadas / c.total * 100) : 0);
+            bg = items.map(c => c.color || '#8a8f98');
+            max = 100;
+            fmt = (v, i) => `${porColegio[i].total} vendidas · ${v}%`;
+        } else { // dinero
+            const items = [...(porColegio || [])].sort((a,b)=>b.recaudado_total - a.recaudado_total);
+            labels = items.map(c => c.nombre);
+            data = items.map(c => c.recaudado_total);
+            bg = items.map(c => c.color || '#8a8f98');
+            max = Math.max(...data, 1) * 1.08;
+            fmt = (v, i) => '₡' + v.toLocaleString('es-CR');
+            // guardar orden para tooltip
+            window._cmpItems = items;
+        }
+        if (!labels.length) {
+            if (chartCmp) { chartCmp.destroy(); chartCmp = null; }
+            const p = document.createElement('p'); p.className='empty'; p.textContent='Sin datos';
+            canvas.replaceWith(p); return;
+        }
+        // Altura dinámica
+        canvas.height = Math.max(80, labels.length * 42 + 24);
+        if (chartCmp) chartCmp.destroy();
+        const ctx = canvas.getContext('2d');
+        chartCmp = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets: [{ data, backgroundColor: bg, borderRadius: 999, borderSkipped: false, barThickness: 14, maxBarThickness: 16 }] },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 700, easing: 'easeOutQuart' },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(18,18,26,0.96)',
+                        titleColor: '#ecebe6',
+                        bodyColor: '#8b8a94',
+                        borderColor: 'rgba(255,255,255,0.08)',
+                        borderWidth: 1,
+                        padding: 10,
+                        displayColors: false,
+                        callbacks: {
+                            label: ctx => {
+                                const i = ctx.dataIndex;
+                                if (modoGrafica === 'evento') return ` ${ctx.raw}% asistencia · ${porEvento[i].usadas}/${porEvento[i].total}`;
+                                if (modoGrafica === 'colegio') return ` ${ctx.raw}% asistencia`;
+                                return ` ${fmt(ctx.raw, i)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        max, grid: { color: 'rgba(255,255,255,0.06)', drawBorder: false }, border: { display: false },
+                        ticks: { color: '#8b8a94', font: { family: 'Space Mono', size: 10 }, callback: v => modoGrafica==='dinero' ? '₡'+Number(v).toLocaleString('es-CR') : v+'%' }
+                    },
+                    y: { grid: { display: false, drawBorder: false }, border: { display: false }, ticks: { color: '#ecebe6', font: { family: 'Karla', size: 11, weight: '600' } } }
+                }
+            }
+        });
+        // Fallback antiguo nativo por si canvas falla — mantiene compat
+        const _oldItems = []; let _getLabel, _getValue, _getSub, _maxVal = 1;
+        if (false) { // nunca ejecuta, solo para referencia del fallback
+            let items = [];
+            let getLabel, getValue, getSub, maxVal = 1;
+            if (modoGrafica === 'evento') {
+                items = porEvento || [];
+                maxVal = Math.max(...items.map(e => e.total), 1);
+                getLabel = e => e.nombre;
+                getValue = e => `${e.usadas}/${e.total}`;
+                getSub = e => `${e.total ? Math.round(e.usadas / e.total * 100) : 0}% asistencia`;
+                for (const e of items) e._barColor = e.colegio_color || colores.g;
+            } else if (modoGrafica === 'colegio') {
+                items = porColegio || [];
+                maxVal = Math.max(...items.map(c => c.total), 1);
+                getLabel = c => c.nombre;
+                getValue = c => c.total;
+                getSub = c => `${c.total ? Math.round(c.usadas / c.total * 100) : 0}% asistencia · ${c.eventos} ev.`;
+                for (const c of items) c._barColor = c.color || '#8a8f98';
+            } else {
+                items = [...(porColegio || [])].sort((a, b) => b.recaudado_total - a.recaudado_total);
+                maxVal = Math.max(...items.map(c => c.recaudado_total), 1);
+                getLabel = c => c.nombre;
+                getValue = c => '₡' + c.recaudado_total.toLocaleString('es-CR');
+                getSub = c => `${c.total} vendidas · ${c.total ? Math.round(c.usadas / c.total * 100) : 0}% asistencia`;
+                for (const c of items) c._barColor = c.color || '#8a8f98';
+            }
+            if (!items.length) return;
+            for (const it of items) {
             const row = document.createElement('div');
             row.className = 'bar-row';
             const colorBar = it._barColor;
@@ -1221,6 +1292,7 @@
             row.querySelector('.bar-name').textContent = getLabel(it);
             wrap.appendChild(row);
         }
+        } // fallback nativo deshabilitado — Chart.js activo
     }
 
     function pintarSemana(logs) {
