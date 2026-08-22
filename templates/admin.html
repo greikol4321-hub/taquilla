@@ -3,40 +3,123 @@
 
 {% block estilos %}
 <style>
-    .admin-grid { width: 100%; display: flex; flex-direction: column; gap: 22px; }
+    /* ===== Layout amplio para PC ===== */
+    .header, .contenido { max-width: 1240px; }
 
-    .panel {
-        background: var(--negro-2);
+    .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+    }
+
+    .vistas { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+    /* ---------- Navegación ---------- */
+    .sidenav {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        scrollbar-width: none;
+    }
+
+    .sidenav::-webkit-scrollbar { display: none; }
+
+    .nav-item {
+        flex-shrink: 0;
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 15px;
+        background: rgba(255, 255, 255, 0.04);
         border: 1px solid var(--linea);
-        border-radius: 16px;
-        padding: 18px;
+        border-radius: 999px;
+        color: var(--texto-suave);
+        font-family: 'Space Mono', monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.3s var(--cubic);
+    }
+
+    .nav-item svg { flex-shrink: 0; }
+    .nav-item:hover { border-color: rgba(217, 255, 61, 0.45); color: var(--texto); }
+
+    .nav-item.activo {
+        background: var(--lima);
+        border-color: var(--lima);
+        color: var(--negro);
+        font-weight: 700;
+    }
+
+    .nav-item .mini-count { font-size: 0.56rem; opacity: 0.75; }
+
+    @media (min-width: 900px) {
+        .layout { grid-template-columns: 224px minmax(0, 1fr); }
+        .sidenav {
+            position: sticky;
+            top: 20px;
+            flex-direction: column;
+            align-items: stretch;
+            overflow: visible;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid var(--linea);
+            border-radius: 20px;
+        }
+        .nav-item {
+            justify-content: flex-start;
+            border-radius: 13px;
+            background: transparent;
+        }
+        .nav-item.activo { background: var(--lima); }
+    }
+
+    /* ---------- Cards doble bisel ---------- */
+    .card {
+        background: rgba(255, 255, 255, 0.035);
+        border: 1px solid var(--linea);
+        border-radius: 22px;
+        padding: 7px;
         animation: pop 0.5s var(--cubic) both;
     }
 
-    .panel h2 {
+    .card-in {
+        background: var(--negro-2);
+        border-radius: 16px;
+        padding: 20px;
+        height: 100%;
+    }
+
+    .card h2 {
         font-family: 'Archivo Black', sans-serif;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         letter-spacing: 0.1em;
         text-transform: uppercase;
         display: flex;
         align-items: center;
         gap: 8px;
-        margin-bottom: 14px;
+        margin-bottom: 16px;
     }
 
-    .panel h2 .count {
+    .card h2 svg { color: var(--lima); flex-shrink: 0; }
+
+    .card h2 .count {
         font-family: 'Space Mono', monospace;
-        font-size: 0.68rem;
+        font-size: 0.66rem;
         color: var(--lima);
         background: var(--lima-suave);
         padding: 2px 10px;
         border-radius: 999px;
     }
 
-    /* ---------- Cards de stats generales ---------- */
+    /* ---------- Stats ---------- */
     .stats-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
     }
 
@@ -71,6 +154,206 @@
     .stat-card .valor.mono { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 1.25rem; }
 
     .stat-card .detalle { font-family: 'Space Mono', monospace; font-size: 0.58rem; color: var(--texto-suave); }
+
+    /* ---------- Bento resumen ---------- */
+    .bento {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+        margin-top: 12px;
+    }
+
+    .accesos {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+    }
+
+    .resumen-link { text-align: left; cursor: pointer; font: inherit; color: inherit; width: 100%; }
+
+    @media (min-width: 900px) {
+        .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    /* ---------- Gráficas ---------- */
+    .chart-titulo {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.58rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+        margin-bottom: 14px;
+    }
+
+    /* Dona */
+    .donut-box { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+
+    .donut { position: relative; width: 136px; height: 136px; flex-shrink: 0; }
+
+    .donut svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+
+    .donut circle {
+        fill: none;
+        stroke-width: 13;
+        stroke-linecap: butt;
+    }
+
+    .donut .donut-bg { stroke: rgba(255, 255, 255, 0.07); }
+    .donut .donut-fg { stroke: var(--lima); transition: stroke-dasharray 0.8s var(--cubic); }
+
+    .donut-center {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+    }
+
+    .donut-center strong {
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 1.15rem;
+        color: var(--texto);
+    }
+
+    .donut-center span {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.52rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+    }
+
+    .leyenda { display: flex; flex-direction: column; gap: 8px; }
+
+    .leyenda .fila { display: flex; align-items: center; gap: 8px; font-family: 'Space Mono', monospace; font-size: 0.62rem; }
+
+    .leyenda .punto { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+    .leyenda .nombre { color: var(--texto-suave); letter-spacing: 0.06em; text-transform: uppercase; }
+
+    .leyenda .dato { margin-left: auto; color: var(--texto); }
+
+    /* Barras por evento */
+    .bar-row { margin-bottom: 14px; }
+    .bar-row:last-child { margin-bottom: 0; }
+
+    .bar-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 6px;
+    }
+
+    .bar-name {
+        font-family: 'Karla', sans-serif;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--texto);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .bar-val { font-family: 'Space Mono', monospace; font-size: 0.62rem; color: var(--texto-suave); white-space: nowrap; }
+
+    .bar-track {
+        position: relative;
+        height: 10px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .bar-total {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background: rgba(217, 255, 61, 0.16);
+        border-radius: 999px;
+        transition: width 0.7s var(--cubic);
+    }
+
+    .bar-fill {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background: var(--lima);
+        border-radius: 999px;
+        transition: width 0.7s var(--cubic);
+    }
+
+    /* Recaudado */
+    .prog-nums { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+
+    .prog-num { display: flex; flex-direction: column; gap: 4px; }
+
+    .prog-num .label {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.55rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--texto-suave);
+    }
+
+    .prog-num .valor {
+        font-family: 'Archivo Black', sans-serif;
+        font-size: 1.25rem;
+        color: var(--lima);
+        line-height: 1;
+    }
+
+    .prog-track {
+        height: 12px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .prog-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, rgba(217, 255, 61, 0.45), var(--lima));
+        border-radius: 999px;
+        transition: width 0.8s var(--cubic);
+    }
+
+    .prog-pie { margin-top: 8px; font-family: 'Space Mono', monospace; font-size: 0.6rem; color: var(--texto-suave); }
+
+    /* Semana */
+    .semana { display: flex; align-items: stretch; gap: 8px; height: 130px; }
+
+    .semana .col {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 5px;
+    }
+
+    .semana .v { font-family: 'Space Mono', monospace; font-size: 0.56rem; color: var(--texto-suave); }
+
+    .semana .b {
+        width: 100%;
+        max-width: 34px;
+        min-height: 3px;
+        background: linear-gradient(180deg, var(--lima), rgba(217, 255, 61, 0.3));
+        border-radius: 6px 6px 2px 2px;
+        transition: height 0.7s var(--cubic);
+    }
+
+    .semana .l {
+        font-family: 'Space Mono', monospace;
+        font-size: 0.54rem;
+        color: var(--texto-suave);
+        text-transform: uppercase;
+    }
 
     /* ---------- Tablas ---------- */
     .tabla-wrap { overflow-x: auto; }
@@ -160,86 +443,38 @@
 
     .filtro:focus { border-color: var(--lima); }
 
-    /* ---------- Tabs ---------- */
-    .tabs {
-        display: flex;
-        gap: 6px;
-        overflow-x: auto;
-        padding-bottom: 4px;
-        scrollbar-width: none;
+    /* ---------- Formularios con etiquetas ---------- */
+    .form-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 14px; }
+
+    @media (min-width: 640px) {
+        .form-grid.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .form-grid.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
 
-    .tabs::-webkit-scrollbar { display: none; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
 
-    .tab {
-        flex-shrink: 0;
-        min-height: 38px;
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        padding: 8px 16px;
-        background: transparent;
-        border: 1px solid var(--linea);
-        border-radius: 999px;
-        color: var(--texto-suave);
+    .field label {
         font-family: 'Space Mono', monospace;
-        font-size: 0.62rem;
-        letter-spacing: 0.08em;
+        font-size: 0.55rem;
+        letter-spacing: 0.16em;
         text-transform: uppercase;
-        cursor: pointer;
-        transition: all 0.3s var(--cubic);
+        color: var(--texto-suave);
     }
 
-    .tab:hover { border-color: var(--lima); color: var(--lima); }
-
-    .tab.activo {
-        background: var(--lima);
-        border-color: var(--lima);
-        color: var(--negro);
-        font-weight: 700;
-    }
-
-    .tab .mini-count { font-size: 0.56rem; opacity: 0.75; }
-
-    /* ---------- Accesos del resumen ---------- */
-    .resumen-links {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-top: 12px;
-    }
-
-    .resumen-link {
-        text-align: left;
-        cursor: pointer;
-        font: inherit;
-        color: inherit;
-    }
-
-    /* ---------- Formularios ---------- */
-    .form-row {
-        display: flex;
-        gap: 9px;
-        margin-bottom: 10px;
-        flex-wrap: wrap;
-    }
-
-    .form-row input, .form-row select {
-        flex: 1 1 160px;
-        min-width: 0;
-        padding: 11px 14px;
+    .field input, .field select {
+        width: 100%;
+        padding: 12px 14px;
         background: var(--negro);
         border: 1px solid var(--linea);
         border-radius: 10px;
         color: var(--texto);
         font-family: 'Space Mono', monospace;
-        font-size: 0.72rem;
+        font-size: 0.74rem;
         outline: none;
+        transition: border-color 0.3s var(--cubic);
     }
 
-    .form-row input:focus, .form-row select:focus { border-color: var(--lima); }
-
-    .form-user { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--linea); }
+    .field input:focus, .field select:focus { border-color: var(--lima); }
 
     .checkbox-admin {
         display: flex;
@@ -250,11 +485,15 @@
         letter-spacing: 0.08em;
         color: var(--texto-suave);
         text-transform: uppercase;
-        padding: 11px 4px;
+        padding: 12px 2px;
         cursor: pointer;
     }
 
-    .checkbox-admin input { accent-color: var(--lima); }
+    .checkbox-admin input { accent-color: var(--lima); width: 15px; height: 15px; }
+
+    form .btn-primario { padding: 13px; font-size: 0.85rem; }
+
+    .form-seccion { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--linea); }
 
     /* ---------- Asignaciones ---------- */
     .asignacion-chip {
@@ -331,121 +570,223 @@
 
     .modal-botones { display: flex; gap: 9px; justify-content: flex-end; margin-top: 6px; }
 
-    .modal-botones .btn-primario { padding: 10px 20px; font-size: 0.75rem; }
-
-    .btn-primario.flex { flex: 1 1 100%; width: 100%; padding: 13px; font-size: 0.85rem; }
+    .modal-botones .btn-primario { padding: 10px 20px; font-size: 0.75rem; width: auto; }
 
     @media (max-width: 420px) {
         .stats-grid { grid-template-columns: 1fr; }
+        .accesos { grid-template-columns: 1fr; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="admin-grid">
-    <nav class="tabs" role="tablist" aria-label="Secciones de administración">
-        <button type="button" class="tab activo" data-tab="resumen" role="tab" aria-selected="true">Resumen</button>
-        <button type="button" class="tab" data-tab="usuarios" role="tab" aria-selected="false">Usuarios <span class="mini-count" id="tcUsuarios">0</span></button>
-        <button type="button" class="tab" data-tab="asignaciones" role="tab" aria-selected="false">Asignaciones <span class="mini-count" id="tcAsignaciones">0</span></button>
-        <button type="button" class="tab" data-tab="eventos" role="tab" aria-selected="false">Eventos <span class="mini-count" id="tcEventos">0</span></button>
-        <button type="button" class="tab" data-tab="logs" role="tab" aria-selected="false">Logs <span class="mini-count" id="tcLogs">0</span></button>
+<div class="layout">
+    <nav class="sidenav" role="tablist" aria-label="Secciones de administración">
+        <button type="button" class="nav-item activo" data-tab="resumen" role="tab" aria-selected="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+            Resumen
+        </button>
+        <button type="button" class="nav-item" data-tab="usuarios" role="tab" aria-selected="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Usuarios <span class="mini-count" id="tcUsuarios">0</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="asignaciones" role="tab" aria-selected="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+            Asignaciones <span class="mini-count" id="tcAsignaciones">0</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="eventos" role="tab" aria-selected="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+            Eventos <span class="mini-count" id="tcEventos">0</span>
+        </button>
+        <button type="button" class="nav-item" data-tab="logs" role="tab" aria-selected="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Logs <span class="mini-count" id="tcLogs">0</span>
+        </button>
     </nav>
 
-    <section class="panel" data-panel="resumen">
-        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Resumen general</h2>
-        <div class="stats-grid">
-            <div class="stat-card"><span class="label">Entradas totales</span><span class="valor" id="stTotal">0</span><span class="detalle" id="stEventos">0 eventos</span></div>
-            <div class="stat-card"><span class="label">Usadas</span><span class="valor" id="stUsadas">0</span><span class="detalle">validadas en puerta</span></div>
-            <div class="stat-card"><span class="label">Recaudado total</span><span class="valor mono" id="stRecTotal">₡0</span><span class="detalle" id="stPend">0 pendientes</span></div>
-            <div class="stat-card"><span class="label">Recaudado usado</span><span class="valor mono" id="stRecUsadas">₡0</span><span class="detalle">efectivamente cobrado</span></div>
-        </div>
-        <div class="resumen-links">
-            <button type="button" class="stat-card resumen-link" data-ir="usuarios"><span class="label">Usuarios</span><span class="valor mono" id="rUsuarios">0</span><span class="detalle">admins y staff</span></button>
-            <button type="button" class="stat-card resumen-link" data-ir="asignaciones"><span class="label">Asignaciones</span><span class="valor mono" id="rAsignaciones">0</span><span class="detalle">usuario · evento · rol</span></button>
-            <button type="button" class="stat-card resumen-link" data-ir="eventos"><span class="label">Eventos</span><span class="valor mono" id="rEventos">0</span><span class="detalle">abiertos y cerrados</span></button>
-            <button type="button" class="stat-card resumen-link" data-ir="logs"><span class="label">Actividad</span><span class="valor mono" id="rLogs">0</span><span class="detalle">registros del sistema</span></button>
-        </div>
-    </section>
+    <div class="vistas">
+        <!-- ============ RESUMEN ============ -->
+        <section class="card" data-panel="resumen">
+            <div class="card-in">
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg> Resumen general</h2>
 
-    <section class="panel" data-panel="eventos" hidden>
-        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h8"/><path d="M7 11h12"/><path d="M7 6h3"/></svg> Eventos <span class="count" id="countEventos">0</span></h2>
+                <div class="stats-grid">
+                    <div class="stat-card"><span class="label">Entradas totales</span><span class="valor" id="stTotal">0</span><span class="detalle" id="stEventos">0 eventos</span></div>
+                    <div class="stat-card"><span class="label">Usadas</span><span class="valor" id="stUsadas">0</span><span class="detalle">validadas en puerta</span></div>
+                    <div class="stat-card"><span class="label">Recaudado total</span><span class="valor mono" id="stRecTotal">₡0</span><span class="detalle" id="stPend">0 pendientes</span></div>
+                    <div class="stat-card"><span class="label">Recaudado usado</span><span class="valor mono" id="stRecUsadas">₡0</span><span class="detalle">efectivamente cobrado</span></div>
+                </div>
 
-        <form class="form-row" id="formEvento">
-            <input type="text" id="evNombre" placeholder="Nombre del evento" autocomplete="off" maxlength="100">
-            <input type="number" id="ePrecio" placeholder="Precio (₡)" min="0" step="1" autocomplete="off">
-            <button class="btn-primario flex" type="submit">Crear evento</button>
-        </form>
+                <div class="bento">
+                    <div>
+                        <p class="chart-titulo">Estado de las entradas</p>
+                        <div class="donut-box">
+                            <div class="donut">
+                                <svg viewBox="0 0 120 120">
+                                    <circle class="donut-bg" cx="60" cy="60" r="50"/>
+                                    <circle class="donut-fg" id="donutArc" cx="60" cy="60" r="50" stroke-dasharray="0 314.16"/>
+                                </svg>
+                                <div class="donut-center"><strong id="donutPct">0%</strong><span>usadas</span></div>
+                            </div>
+                            <div class="leyenda">
+                                <div class="fila"><span class="punto" style="background:var(--lima)"></span><span class="nombre">Usadas</span><span class="dato" id="lgUsadas">0</span></div>
+                                <div class="fila"><span class="punto" style="background:rgba(217,255,61,0.25)"></span><span class="nombre">Pendientes</span><span class="dato" id="lgPend">0</span></div>
+                                <div class="fila"><span class="punto" style="background:rgba(255,255,255,0.25)"></span><span class="nombre">Total</span><span class="dato" id="lgTotal">0</span></div>
+                            </div>
+                        </div>
+                    </div>
 
-        <div class="tabla-wrap">
-            <table>
-                <thead>
-                    <tr><th>Evento</th><th>Precio</th><th>Estado</th><th>Entradas</th><th></th></tr>
-                </thead>
-                <tbody id="eventosBody"></tbody>
-            </table>
-        </div>
-    </section>
+                    <div>
+                        <p class="chart-titulo">Entradas por evento</p>
+                        <div id="chartEventos"></div>
+                    </div>
 
-    <section class="panel" data-panel="usuarios" hidden>
-        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Usuarios <span class="count" id="countUsers">0</span></h2>
+                    <div>
+                        <p class="chart-titulo">Recaudación</p>
+                        <div class="prog-nums">
+                            <div class="prog-num"><span class="label">Cobrado en puerta</span><span class="valor" id="recUsadas">₡0</span></div>
+                            <div class="prog-num"><span class="label">Vendido total</span><span class="valor" style="color:var(--texto)" id="recTotal">₡0</span></div>
+                        </div>
+                        <div class="prog-track"><div class="prog-fill" id="barRec"></div></div>
+                        <p class="prog-pie" id="recPct">0% cobrado</p>
+                    </div>
 
-        <div class="form-user">
-            <form class="form-row" id="formUser">
-                <input type="text" id="uNombre" placeholder="Nombre (opcional)">
-                <input type="text" id="uUsuario" placeholder="Usuario" autocomplete="off">
-                <input type="password" id="uPassword" placeholder="Contraseña" autocomplete="new-password">
-                <label class="checkbox-admin"><input type="checkbox" id="uAdmin"> Es administrador</label>
-                <button class="btn-primario flex" type="submit">Crear usuario</button>
-            </form>
-        </div>
+                    <div>
+                        <p class="chart-titulo">Actividad · últimos 7 días</p>
+                        <div class="semana" id="chartSemana"></div>
+                    </div>
+                </div>
 
-        <div class="tabla-wrap">
-            <table>
-                <thead>
-                    <tr><th>Usuario</th><th>Nombre</th><th>Tipo</th><th>Asignado a</th><th></th></tr>
-                </thead>
-                <tbody id="usersBody"></tbody>
-            </table>
-        </div>
-    </section>
+                <div class="accesos">
+                    <button type="button" class="stat-card resumen-link" data-ir="usuarios"><span class="label">Usuarios</span><span class="valor mono" id="rUsuarios">0</span><span class="detalle">admins y staff</span></button>
+                    <button type="button" class="stat-card resumen-link" data-ir="asignaciones"><span class="label">Asignaciones</span><span class="valor mono" id="rAsignaciones">0</span><span class="detalle">usuario · evento · rol</span></button>
+                    <button type="button" class="stat-card resumen-link" data-ir="eventos"><span class="label">Eventos</span><span class="valor mono" id="rEventos">0</span><span class="detalle">abiertos y cerrados</span></button>
+                    <button type="button" class="stat-card resumen-link" data-ir="logs"><span class="label">Actividad</span><span class="valor mono" id="rLogs">0</span><span class="detalle">registros del sistema</span></button>
+                </div>
+            </div>
+        </section>
 
-    <section class="panel" data-panel="asignaciones" hidden>
-        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg> Asignaciones</h2>
+        <!-- ============ USUARIOS ============ -->
+        <section class="card" data-panel="usuarios" hidden>
+            <div class="card-in">
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Usuarios <span class="count" id="countUsers">0</span></h2>
 
-        <div class="form-user">
-            <form class="form-row" id="formAsignar">
-                <select id="asignarUser"><option value="">Usuario…</option></select>
-                <select id="asignarEvento"><option value="">Evento…</option></select>
-                <select id="asignarRol">
-                    <option value="vendedor">Vendedor</option>
-                    <option value="portero">Portero</option>
-                </select>
-                <button class="btn-primario flex" type="submit">Asignar</button>
-            </form>
-        </div>
+                <form class="form-seccion" id="formUser">
+                    <div class="form-grid c2">
+                        <div class="field">
+                            <label for="uNombre">Nombre completo</label>
+                            <input type="text" id="uNombre" placeholder="Opcional" autocomplete="off">
+                        </div>
+                        <div class="field">
+                            <label for="uUsuario">Usuario</label>
+                            <input type="text" id="uUsuario" placeholder="Sin espacios" autocomplete="off">
+                        </div>
+                        <div class="field">
+                            <label for="uPassword">Contraseña</label>
+                            <input type="password" id="uPassword" placeholder="Mínimo recomendado: 8 caracteres" autocomplete="new-password">
+                        </div>
+                        <div class="field">
+                            <label>Permisos</label>
+                            <label class="checkbox-admin"><input type="checkbox" id="uAdmin"> Es administrador</label>
+                        </div>
+                    </div>
+                    <button class="btn-primario" type="submit">Crear usuario</button>
+                </form>
 
-        <div class="tabla-wrap">
-            <table>
-                <thead>
-                    <tr><th>Usuario</th><th>Rol</th><th>Evento</th><th></th></tr>
-                </thead>
-                <tbody id="asigBody"></tbody>
-            </table>
-        </div>
-    </section>
+                <div class="tabla-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Usuario</th><th>Nombre</th><th>Tipo</th><th>Asignado a</th><th></th></tr>
+                        </thead>
+                        <tbody id="usersBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
 
-    <section class="panel" data-panel="logs" hidden>
-        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Registro de actividad <span class="count" id="countLogs">0</span></h2>
-        <input class="filtro" id="filtroLogs" placeholder="Filtrar por usuario, acción o detalle…">
-        <div class="tabla-wrap">
-            <table>
-                <thead>
-                    <tr><th>Fecha</th><th>Acción</th><th>Detalle</th><th>Usuario</th></tr>
-                </thead>
-                <tbody id="logsBody"></tbody>
-            </table>
-        </div>
-    </section>
+        <!-- ============ ASIGNACIONES ============ -->
+        <section class="card" data-panel="asignaciones" hidden>
+            <div class="card-in">
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg> Asignaciones</h2>
+
+                <form class="form-seccion" id="formAsignar">
+                    <div class="form-grid c3">
+                        <div class="field">
+                            <label for="asignarUser">Usuario</label>
+                            <select id="asignarUser"><option value="">Elegir…</option></select>
+                        </div>
+                        <div class="field">
+                            <label for="asignarEvento">Evento</label>
+                            <select id="asignarEvento"><option value="">Elegir…</option></select>
+                        </div>
+                        <div class="field">
+                            <label for="asignarRol">Rol</label>
+                            <select id="asignarRol">
+                                <option value="vendedor">Vendedor</option>
+                                <option value="portero">Portero</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn-primario" type="submit">Asignar</button>
+                </form>
+
+                <div class="tabla-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Usuario</th><th>Rol</th><th>Evento</th><th></th></tr>
+                        </thead>
+                        <tbody id="asigBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ EVENTOS ============ -->
+        <section class="card" data-panel="eventos" hidden>
+            <div class="card-in">
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg> Eventos <span class="count" id="countEventos">0</span></h2>
+
+                <form class="form-seccion" id="formEvento">
+                    <div class="form-grid c2">
+                        <div class="field">
+                            <label for="evNombre">Nombre del evento</label>
+                            <input type="text" id="evNombre" placeholder="Ej: Baile CTPM 2027" autocomplete="off" maxlength="100">
+                        </div>
+                        <div class="field">
+                            <label for="ePrecio">Precio por entrada (₡)</label>
+                            <input type="number" id="ePrecio" placeholder="Ej: 1000" min="0" step="1" autocomplete="off">
+                        </div>
+                    </div>
+                    <button class="btn-primario" type="submit">Crear evento</button>
+                </form>
+
+                <div class="tabla-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Evento</th><th>Precio</th><th>Estado</th><th>Entradas</th><th></th></tr>
+                        </thead>
+                        <tbody id="eventosBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ LOGS ============ -->
+        <section class="card" data-panel="logs" hidden>
+            <div class="card-in">
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Registro de actividad <span class="count" id="countLogs">0</span></h2>
+                <input class="filtro" id="filtroLogs" placeholder="Filtrar por usuario, acción o detalle…" aria-label="Filtrar registros">
+                <div class="tabla-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Fecha</th><th>Acción</th><th>Detalle</th><th>Usuario</th></tr>
+                        </thead>
+                        <tbody id="logsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
 </div>
 
 <dialog class="modal-edit" id="modalEdit">
@@ -464,7 +805,7 @@
 
 <dialog class="modal-edit" id="modalEvento">
     <form id="formEventoEdit">
-        <h3><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Editar evento</h3>
+        <h3><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg> Editar evento</h3>
         <input type="text" id="eeNombre" placeholder="Nombre del evento">
         <input type="number" id="eePrecio" placeholder="Precio entrada (₡)" min="0" step="1">
         <label style="display:flex;align-items:center;gap:8px;font-size:0.7rem;color:var(--texto-suave)">
@@ -499,15 +840,17 @@
         'evento_seleccionar': 'Seleccionar evento'
     };
 
+    const C_DONUT = 2 * Math.PI * 50;
+
     async function api(url, opciones = {}) {
         const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opciones });
         return r.json();
     }
 
-    // ---------- Tabs ----------
+    // ---------- Navegación ----------
     function cambiarTab(nombre) {
         if (!document.querySelector(`[data-panel="${nombre}"]`)) nombre = 'resumen';
-        document.querySelectorAll('.tab').forEach(t => {
+        document.querySelectorAll('.nav-item').forEach(t => {
             const activo = t.dataset.tab === nombre;
             t.classList.toggle('activo', activo);
             t.setAttribute('aria-selected', activo);
@@ -516,8 +859,8 @@
         history.replaceState(null, '', '#' + nombre);
     }
 
-    document.querySelector('.tabs').addEventListener('click', e => {
-        const btn = e.target.closest('.tab');
+    document.querySelector('.sidenav').addEventListener('click', e => {
+        const btn = e.target.closest('.nav-item');
         if (btn) cambiarTab(btn.dataset.tab);
     });
 
@@ -527,15 +870,75 @@
     // ---------- Dashboard ----------
     async function cargarDashboard() {
         const data = await api('/api/dashboard');
-        if (!data.ok) return;
         const g = data.general;
+        if (!g) return [];
         document.getElementById('stTotal').textContent = g.total;
         document.getElementById('stUsadas').textContent = g.usadas;
         document.getElementById('stRecTotal').textContent = '₡' + g.recaudado_total.toLocaleString('es-CR');
         document.getElementById('stRecUsadas').textContent = '₡' + g.recaudado_usadas.toLocaleString('es-CR');
         document.getElementById('stEventos').textContent = g.eventos + ' eventos';
         document.getElementById('stPend').textContent = (g.total - g.usadas) + ' pendientes';
+
+        const pct = g.total ? Math.round(g.usadas / g.total * 100) : 0;
+        document.getElementById('donutArc').style.strokeDasharray = `${C_DONUT * pct / 100} ${C_DONUT}`;
+        document.getElementById('donutPct').textContent = pct + '%';
+        document.getElementById('lgUsadas').textContent = g.usadas;
+        document.getElementById('lgPend').textContent = g.total - g.usadas;
+        document.getElementById('lgTotal').textContent = g.total;
+
+        document.getElementById('recUsadas').textContent = '₡' + g.recaudado_usadas.toLocaleString('es-CR');
+        document.getElementById('recTotal').textContent = '₡' + g.recaudado_total.toLocaleString('es-CR');
+        const pctR = g.recaudado_total ? Math.round(g.recaudado_usadas / g.recaudado_total * 100) : 0;
+        document.getElementById('barRec').style.width = pctR + '%';
+        document.getElementById('recPct').textContent = pctR + '% cobrado';
+
+        pintarChartEventos(data.por_evento || []);
         return data.por_evento || [];
+    }
+
+    function pintarChartEventos(porEvento) {
+        const wrap = document.getElementById('chartEventos');
+        wrap.innerHTML = '';
+        if (!porEvento.length) {
+            wrap.innerHTML = '<p class="empty">Sin eventos todavía</p>';
+            return;
+        }
+        const max = Math.max(...porEvento.map(e => e.total), 1);
+        for (const ev of porEvento) {
+            const row = document.createElement('div');
+            row.className = 'bar-row';
+            row.innerHTML = `
+                <div class="bar-head"><span class="bar-name"></span><span class="bar-val">${ev.usadas}/${ev.total}</span></div>
+                <div class="bar-track">
+                    <div class="bar-total" style="width:${(ev.total / max * 100).toFixed(1)}%"></div>
+                    <div class="bar-fill" style="width:${(ev.usadas / max * 100).toFixed(1)}%"></div>
+                </div>`;
+            row.querySelector('.bar-name').textContent = ev.nombre;
+            wrap.appendChild(row);
+        }
+    }
+
+    function pintarSemana(logs) {
+        // ponytail: compara fecha UTC del log con día local; desfase de horas no afecta el gráfico semanal
+        const dias = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            dias.push({ key: d.toISOString().slice(0, 10), label: ['D', 'L', 'M', 'M', 'J', 'V', 'S'][d.getDay()], n: 0 });
+        }
+        for (const l of logs || []) {
+            const dia = dias.find(x => x.key === (l.creado_en || '').slice(0, 10));
+            if (dia) dia.n++;
+        }
+        const max = Math.max(...dias.map(d => d.n), 1);
+        const wrap = document.getElementById('chartSemana');
+        wrap.innerHTML = '';
+        for (const d of dias) {
+            const col = document.createElement('div');
+            col.className = 'col';
+            col.innerHTML = `<span class="v">${d.n || ''}</span><div class="b" style="height:${Math.max(d.n / max * 100, 3)}%"></div><span class="l">${d.label}</span>`;
+            wrap.appendChild(col);
+        }
     }
 
     // ---------- Eventos ----------
@@ -567,6 +970,62 @@
             body.appendChild(tr);
         }
     }
+
+    const modalEvento = document.getElementById('modalEvento');
+
+    document.getElementById('formEvento').addEventListener('submit', async e => {
+        e.preventDefault();
+        const nombre = document.getElementById('evNombre').value.trim();
+        const precio = parseInt(document.getElementById('ePrecio').value) || 1000;
+        if (!nombre) { mostrarToast('Ingresá un nombre para el evento', 'error'); return; }
+        const data = await api('/api/eventos', {
+            method: 'POST',
+            body: JSON.stringify({ nombre, precio })
+        });
+        if (data.ok) {
+            document.getElementById('evNombre').value = '';
+            document.getElementById('ePrecio').value = '';
+            mostrarToast('Evento creado', 'ok');
+            cargarEventos(); cargarDashboard(); cargarLogs(); cargarSelectores();
+        } else {
+            mostrarToast(data.error || 'Error', 'error');
+        }
+    });
+
+    document.getElementById('eventosBody').addEventListener('click', async e => {
+        const btn = e.target.closest('button[data-edit-ev], button[data-del-ev]');
+        if (!btn) return;
+        const id = parseInt(btn.dataset.editEv || btn.dataset.delEv);
+        if (btn.dataset.delEv) {
+            if (!confirm('¿Borrar el evento "' + btn.closest('tr').children[0].textContent + '"? Se borrarán sus entradas, logs y asignaciones.')) return;
+            const data = await api(`/api/eventos/${id}`, { method: 'DELETE' });
+            if (data.ok) { mostrarToast('Evento borrado', 'ok'); cargarEventos(); cargarUsers(); cargarDashboard(); cargarLogs(); cargarSelectores(); }
+            else mostrarToast(data.error || 'Error', 'error');
+            return;
+        }
+        editandoEventoId = id;
+        const row = btn.closest('tr');
+        document.getElementById('eeNombre').value = row.children[0].textContent;
+        document.getElementById('eePrecio').value = row.children[1].textContent.replace(/[^0-9]/g, '');
+        document.getElementById('eeActivo').checked = row.children[2].textContent.includes('Abierto');
+        modalEvento.showModal();
+        document.getElementById('eeNombre').focus();
+    });
+
+    document.getElementById('formEventoEdit').addEventListener('submit', async e => {
+        e.preventDefault();
+        const body = {
+            nombre: document.getElementById('eeNombre').value.trim(),
+            precio_entrada: parseInt(document.getElementById('eePrecio').value) || 0,
+            activo: document.getElementById('eeActivo').checked
+        };
+        const data = await api(`/api/eventos/${editandoEventoId}`, { method: 'PUT', body: JSON.stringify(body) });
+        modalEvento.close();
+        if (data.ok) { mostrarToast('Evento actualizado', 'ok'); cargarEventos(); cargarDashboard(); cargarLogs(); }
+        else mostrarToast(data.error || 'Error', 'error');
+    });
+
+    document.getElementById('btnCancelarEvento').addEventListener('click', () => modalEvento.close());
 
     // ---------- Usuarios ----------
     async function cargarUsers() {
@@ -624,109 +1083,6 @@
         if (!totalAsig) asigBody.innerHTML = '<tr><td colspan="4" class="empty">Sin asignaciones</td></tr>';
     }
 
-    // ---------- Logs ----------
-    function chipClase(accion) {
-        if (['user_crear', 'user_editar', 'user_borrar', 'user_asignar', 'user_desasignar'].includes(accion)) return 'user_crear';
-        return accion;
-    }
-
-    function formatearFecha(iso) {
-        if (!iso) return '';
-        const d = new Date(iso);
-        const pad = n => String(n).padStart(2, '0');
-        return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    }
-
-    async function cargarLogs() {
-        const data = await api('/api/logs');
-        const total = data.logs ? data.logs.length : 0;
-        document.getElementById('countLogs').textContent = total;
-        document.getElementById('tcLogs').textContent = total;
-        document.getElementById('rLogs').textContent = total;
-        const filtro = document.getElementById('filtroLogs').value.trim().toLowerCase();
-        const body = document.getElementById('logsBody');
-        body.innerHTML = '';
-        const logs = (data.logs || []).filter(l =>
-            !filtro ||
-            (l.usuario || '').toLowerCase().includes(filtro) ||
-            (l.accion || '').toLowerCase().includes(filtro) ||
-            (l.detalle || '').toLowerCase().includes(filtro)
-        );
-        if (!logs.length) {
-            body.innerHTML = '<tr><td colspan="4" class="empty">Sin registros</td></tr>';
-            return;
-        }
-        for (const l of logs) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="fecha">${formatearFecha(l.creado_en)}</td>
-                <td><span class="chip ${chipClase(l.accion)}">${ACCIONES[l.accion] || l.accion}</span></td>
-                <td class="detalle"></td>
-                <td style="font-family:'Space Mono',monospace;font-size:0.66rem;white-space:nowrap">${l.usuario || ''}</td>`;
-            tr.querySelector('.detalle').textContent = l.detalle || '';
-            body.appendChild(tr);
-        }
-    }
-
-    // ---------- Eventos: crear / editar / borrar ----------
-    document.getElementById('formEvento').addEventListener('submit', async e => {
-        e.preventDefault();
-        const nombre = document.getElementById('evNombre').value.trim();
-        const precio = parseInt(document.getElementById('ePrecio').value) || 1000;
-        if (!nombre) { mostrarToast('Ingresá un nombre para el evento', 'error'); return; }
-        const data = await api('/api/eventos', {
-            method: 'POST',
-            body: JSON.stringify({ nombre, precio })
-        });
-        if (data.ok) {
-            document.getElementById('evNombre').value = '';
-            document.getElementById('ePrecio').value = '';
-            mostrarToast('Evento creado', 'ok');
-            cargarEventos(); cargarDashboard(); cargarLogs();
-            cargarSelectores();
-        } else {
-            mostrarToast(data.error || 'Error', 'error');
-        }
-    });
-
-    const modalEvento = document.getElementById('modalEvento');
-
-    document.getElementById('eventosBody').addEventListener('click', async e => {
-        const btn = e.target.closest('button[data-edit-ev], button[data-del-ev]');
-        if (!btn) return;
-        const id = parseInt(btn.dataset.editEv || btn.dataset.delEv);
-        if (btn.dataset.delEv) {
-            if (!confirm('¿Borrar el evento "' + btn.closest('tr').children[0].textContent + '"? Se borrarán sus entradas, logs y asignaciones.')) return;
-            const data = await api(`/api/eventos/${id}`, { method: 'DELETE' });
-            if (data.ok) { mostrarToast('Evento borrado', 'ok'); cargarEventos(); cargarUsers(); cargarDashboard(); cargarLogs(); cargarSelectores(); }
-            else mostrarToast(data.error || 'Error', 'error');
-            return;
-        }
-        editandoEventoId = id;
-        const row = btn.closest('tr');
-        document.getElementById('eeNombre').value = row.children[0].textContent;
-        document.getElementById('eePrecio').value = row.children[1].textContent.replace(/[^0-9]/g, '');
-        document.getElementById('eeActivo').checked = row.children[2].textContent.includes('Abierto');
-        modalEvento.showModal();
-        document.getElementById('eeNombre').focus();
-    });
-
-    document.getElementById('formEventoEdit').addEventListener('submit', async e => {
-        e.preventDefault();
-        const body = {
-            nombre: document.getElementById('eeNombre').value.trim(),
-            precio_entrada: parseInt(document.getElementById('eePrecio').value) || 0,
-            activo: document.getElementById('eeActivo').checked
-        };
-        const data = await api(`/api/eventos/${editandoEventoId}`, { method: 'PUT', body: JSON.stringify(body) });
-        modalEvento.close();
-        if (data.ok) { mostrarToast('Evento actualizado', 'ok'); cargarEventos(); cargarDashboard(); cargarLogs(); }
-        else mostrarToast(data.error || 'Error', 'error');
-    });
-
-    document.getElementById('btnCancelarEvento').addEventListener('click', () => modalEvento.close());
-
-    // ---------- Usuarios: crear / asignar / editar / borrar ----------
     document.getElementById('formUser').addEventListener('submit', async e => {
         e.preventDefault();
         const data = await api('/api/users', {
@@ -752,8 +1108,8 @@
         const [users, eventos] = await Promise.all([api('/api/users'), api('/api/eventos')]);
         const selU = document.getElementById('asignarUser');
         const selE = document.getElementById('asignarEvento');
-        selU.innerHTML = '<option value="">Usuario…</option>';
-        selE.innerHTML = '<option value="">Evento…</option>';
+        selU.innerHTML = '<option value="">Elegir…</option>';
+        selE.innerHTML = '<option value="">Elegir…</option>';
         (users.users || []).forEach(u => {
             const opt = document.createElement('option');
             opt.value = u.id;
@@ -767,6 +1123,20 @@
             selE.appendChild(opt);
         });
     }
+
+    async function quitarAsignacion(usuarioId, eventoId) {
+        const data = await api('/api/asignar', {
+            method: 'DELETE',
+            body: JSON.stringify({ usuario_id: parseInt(usuarioId), evento_id: parseInt(eventoId) })
+        });
+        if (data.ok) { mostrarToast('Asignación quitada', 'ok'); cargarUsers(); cargarLogs(); }
+        else mostrarToast(data.error || 'Error', 'error');
+    }
+
+    document.getElementById('asigBody').addEventListener('click', e => {
+        const btn = e.target.closest('button[data-desasig]');
+        if (btn) quitarAsignacion(btn.dataset.desasig, btn.dataset.ev);
+    });
 
     document.getElementById('formAsignar').addEventListener('submit', async e => {
         e.preventDefault();
@@ -786,19 +1156,8 @@
         }
     });
 
-    async function quitarAsignacion(usuarioId, eventoId) {
-        const data = await api('/api/asignar', {
-            method: 'DELETE',
-            body: JSON.stringify({ usuario_id: parseInt(usuarioId), evento_id: parseInt(eventoId) })
-        });
-        if (data.ok) { mostrarToast('Asignación quitada', 'ok'); cargarUsers(); cargarLogs(); }
-        else mostrarToast(data.error || 'Error', 'error');
-    }
-
-    document.getElementById('asigBody').addEventListener('click', e => {
-        const btn = e.target.closest('button[data-desasig]');
-        if (btn) quitarAsignacion(btn.dataset.desasig, btn.dataset.ev);
-    });
+    let editandoId = null;
+    const modalEdit = document.getElementById('modalEdit');
 
     document.getElementById('usersBody').addEventListener('click', async e => {
         const btnDes = e.target.closest('button[data-desasig]');
@@ -826,9 +1185,6 @@
         document.getElementById('eNombre').focus();
     });
 
-    let editandoId = null;
-    const modalEdit = document.getElementById('modalEdit');
-
     document.getElementById('formEdit').addEventListener('submit', async e => {
         e.preventDefault();
         const body = {
@@ -846,18 +1202,58 @@
 
     document.getElementById('btnCancelarEdit').addEventListener('click', () => modalEdit.close());
 
+    // ---------- Logs ----------
+    function chipClase(accion) {
+        if (['user_crear', 'user_editar', 'user_borrar', 'user_asignar', 'user_desasignar'].includes(accion)) return 'user_crear';
+        return accion;
+    }
+
+    function formatearFecha(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        const pad = n => String(n).padStart(2, '0');
+        return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    async function cargarLogs() {
+        const data = await api('/api/logs');
+        const logs = data.logs || [];
+        document.getElementById('countLogs').textContent = logs.length;
+        document.getElementById('tcLogs').textContent = logs.length;
+        document.getElementById('rLogs').textContent = logs.length;
+        const filtro = document.getElementById('filtroLogs').value.trim().toLowerCase();
+        const body = document.getElementById('logsBody');
+        body.innerHTML = '';
+        const filtrados = logs.filter(l =>
+            !filtro ||
+            (l.usuario || '').toLowerCase().includes(filtro) ||
+            (l.accion || '').toLowerCase().includes(filtro) ||
+            (l.detalle || '').toLowerCase().includes(filtro)
+        );
+        if (!filtrados.length) {
+            body.innerHTML = '<tr><td colspan="4" class="empty">Sin registros</td></tr>';
+        } else {
+            for (const l of filtrados) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="fecha">${formatearFecha(l.creado_en)}</td>
+                    <td><span class="chip ${chipClase(l.accion)}">${ACCIONES[l.accion] || l.accion}</span></td>
+                    <td class="detalle"></td>
+                    <td style="font-family:'Space Mono',monospace;font-size:0.66rem;white-space:nowrap">${l.usuario || ''}</td>`;
+                tr.querySelector('.detalle').textContent = l.detalle || '';
+                body.appendChild(tr);
+            }
+        }
+        pintarSemana(logs);
+    }
+
     document.getElementById('filtroLogs').addEventListener('input', cargarLogs);
 
     // ---------- Init ----------
     async function init() {
-        await Promise.all([cargarDashboard(), cargarEventos(), cargarUsers(), cargarLogs(), cargarSelectores()]);
+        await Promise.all([cargarEventos(), cargarUsers(), cargarLogs(), cargarSelectores()]);
+        await cargarDashboard();
         cambiarTab(location.hash.slice(1) || 'resumen');
-        const porEvento = await cargarDashboard();
-        const celdas = document.querySelectorAll('#eventosBody td[data-ev-id]');
-        celdas.forEach(cd => {
-            const ev = (porEvento || []).find(x => x.id === parseInt(cd.dataset.evId));
-            if (ev) cd.textContent = ev.total + ' · ' + ev.usadas + ' usadas';
-        });
     }
 
     init();
