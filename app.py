@@ -1107,7 +1107,7 @@ def api_users_editar(user_id):
         if "rol" in cambios:
             session["rol"] = cambios["rol"]
 
-    antes = prev.data[0]
+    antes = prev_row
     textos = []
     if "usuario" in cambios:
         textos.append(f"usuario {antes['usuario']} → {cambios['usuario']}")
