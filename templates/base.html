@@ -232,32 +232,99 @@
 
         .footer .evento { color: var(--lima); }
 
-        /* ---------- Toast ---------- */
-        .toast {
+        /* ---------- Toast · Taquilla — glass + spring ---------- */
+        .toast-stack {
             position: fixed;
-            bottom: calc(96px + env(safe-area-inset-bottom));
+            top: calc(18px + env(safe-area-inset-top));
             left: 50%;
-            transform: translateX(-50%) translateY(16px);
-            background: var(--negro-2);
-            border: 1px solid var(--lima);
-            color: var(--lima);
-            padding: 12px 22px;
-            border-radius: 999px;
-            font-family: 'Space Mono', monospace;
-            font-size: 0.72rem;
-            letter-spacing: 0.05em;
-            opacity: 0;
+            transform: translateX(-50%);
+            z-index: 300;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
             pointer-events: none;
-            transition: all 0.4s var(--cubic);
-            z-index: 200;
-            max-width: 90vw;
-            text-align: center;
+            width: min(420px, 92vw);
         }
-
-        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-        .toast.ok { border-color: #7ee787; color: #7ee787; }
-        .toast.error { border-color: var(--rojo); color: var(--rojo); }
+        .tst {
+            width: 100%;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 13px 14px 13px 14px;
+            background: rgba(18, 18, 26, 0.88);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            box-shadow: 0 14px 44px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+            pointer-events: auto;
+            cursor: pointer;
+            overflow: hidden;
+            position: relative;
+            animation: tstIn 0.5s var(--cubic) both;
+        }
+        .tst.out { animation: tstOut 0.38s var(--cubic) forwards; }
+        .tst-ico {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .tst.ok .tst-ico { background: rgba(126, 231, 135, 0.14); color: #7ee787; border: 1px solid rgba(126, 231, 135, 0.22); }
+        .tst.error .tst-ico { background: rgba(255, 77, 77, 0.12); color: var(--rojo); border: 1px solid rgba(255, 77, 77, 0.22); }
+        .tst.info .tst-ico { background: rgba(217, 255, 61, 0.1); color: var(--lima); border: 1px solid rgba(217, 255, 61, 0.18); }
+        .tst-body { flex: 1; min-width: 0; }
+        .tst-title {
+            font-family: 'Karla', sans-serif;
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            line-height: 1.25;
+            color: var(--texto);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tst.ok .tst-title { color: #e6ffe9; }
+        .tst.error .tst-title { color: #ffe6e6; }
+        .tst-msg {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.64rem;
+            letter-spacing: 0.03em;
+            color: var(--texto-suave);
+            margin-top: 2px;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .tst-bar {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            height: 2px;
+            width: 100%;
+            transform-origin: left;
+            animation: tstShrink var(--tst-dur, 3200ms) linear forwards;
+        }
+        .tst.ok .tst-bar { background: #7ee787; }
+        .tst.error .tst-bar { background: var(--rojo); }
+        .tst.info .tst-bar { background: var(--lima); }
+        @keyframes tstIn {
+            from { opacity: 0; transform: translateY(-14px) scale(0.96); filter: blur(6px); }
+            to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+        @keyframes tstOut {
+            from { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+            to { opacity: 0; transform: translateY(-10px) scale(0.97); filter: blur(4px); }
+        }
+        @keyframes tstShrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
         /* ---------- Animaciones ---------- */
         @keyframes sube {
@@ -318,17 +385,48 @@
     {% endif %}
 
     {% if request.path != '/login' %}
-    <div class="toast" id="toast"></div>
+    <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="false"></div>
     <script>
-        const toastEl = document.getElementById('toast');
-        let toastTimer = null;
+        // Compat: algunos templates viejos esperan #toast — lo mantenemos oculto
+        const _legacyToast = document.createElement('div');
+        _legacyToast.id = 'toast';
+        _legacyToast.style.display = 'none';
+        document.body.appendChild(_legacyToast);
+        const toastStack = document.getElementById('toastStack');
+        const ICONS = {
+            ok: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+            error: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>',
+            info: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>'
+        };
         function mostrarToast(msg, tipo) {
-            toastEl.textContent = msg;
-            toastEl.classList.remove('ok', 'error');
-            if (tipo) toastEl.classList.add(tipo);
-            toastEl.classList.add('show');
-            clearTimeout(toastTimer);
-            toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+            const kind = (tipo === 'ok' || tipo === 'error') ? tipo : 'info';
+            const titles = { ok: 'Listo', error: 'Atención', info: 'Aviso' };
+            // Heurística: si el mensaje es corto (≤36ch) va como título, si no se parte
+            let title = titles[kind];
+            let body = msg;
+            if (msg && msg.length <= 36 && !msg.includes('\n')) { title = msg; body = ''; }
+            const dur = kind === 'error' ? 4200 : 3200;
+            const el = document.createElement('div');
+            el.className = 'tst ' + kind;
+            el.style.setProperty('--tst-dur', dur + 'ms');
+            el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+            el.innerHTML = '<div class="tst-ico">' + (ICONS[kind] || ICONS.info) + '</div>'
+                + '<div class="tst-body"><div class="tst-title"></div>' + (body ? '<div class="tst-msg"></div>' : '') + '</div>'
+                + '<div class="tst-bar"></div>';
+            el.querySelector('.tst-title').textContent = title;
+            if (body) el.querySelector('.tst-msg').textContent = body;
+            const dismiss = () => {
+                el.classList.add('out');
+                el.addEventListener('animationend', () => el.remove(), { once: true });
+            };
+            el.addEventListener('click', dismiss);
+            // Apilar: máximo 3 visibles, la más vieja se va
+            toastStack.appendChild(el);
+            while (toastStack.children.length > 3) toastStack.firstElementChild.remove();
+            setTimeout(dismiss, dur);
+            // Compatibilidad: reflejar último mensaje en #toast para código que lo lee
+            _legacyToast.textContent = msg;
+            _legacyToast.className = 'toast ' + kind;
         }
         document.getElementById('btnLogout').addEventListener('click', async () => {
             await fetch('/api/logout', { method: 'POST' });
