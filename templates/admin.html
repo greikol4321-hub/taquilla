@@ -169,7 +169,7 @@
     }
 
     .form-row input, .form-row select {
-        flex: 1;
+        flex: 1 1 160px;
         min-width: 0;
         padding: 11px 14px;
         background: var(--negro);
@@ -277,11 +277,10 @@
 
     .modal-botones .btn-primario { padding: 10px 20px; font-size: 0.75rem; }
 
-    .btn-primario.flex { width: auto; padding: 12px 18px; font-size: 0.75rem; }
+    .btn-primario.flex { flex: 1 1 100%; width: 100%; padding: 13px; font-size: 0.85rem; }
 
     @media (max-width: 420px) {
         .stats-grid { grid-template-columns: 1fr; }
-        .form-row input, .form-row select { min-width: 100%; }
     }
 </style>
 {% endblock %}
