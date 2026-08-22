@@ -19,6 +19,7 @@ Modelo de usuarios:
 
 import os
 import re
+import time
 import uuid
 import io
 import csv
@@ -58,6 +59,11 @@ app = Flask(__name__,
             template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"))
 
 app.secret_key = os.environ.get("SECRET_KEY", "clave-local-de-desarrollo")
+
+# Cookies de sesion: solo por HTTPS y sin CSRF cross-site
+app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # Nombre por defecto de la pagina (no atado a ningun evento en particular)
 NOMBRE_EVENTO_DEFAULT = os.environ.get("NOMBRE_EVENTO", "Sistema de Entradas")
@@ -323,8 +329,29 @@ def admin():
 # -----------------------------------------------------------
 # API: login / logout
 # -----------------------------------------------------------
+# ponytail: rate limit en memoria (se reinicia por instancia serverless);
+# igual frena la fuerza bruta. Redis si algun dia importa multi-instancia.
+_LOGIN_INTENTOS: dict = {}
+
+def _login_bloqueado():
+    ip = request.headers.get("x-forwarded-for", request.remote_addr or "?").split(",")[0]
+    ahora = time.time()
+    ventana = [t for t in _LOGIN_INTENTOS.get(ip, []) if ahora - t < 300]
+    _LOGIN_INTENTOS[ip] = ventana
+    if len(ventana) >= 10:
+        return True
+    return False
+
+def _registrar_intento():
+    ip = request.headers.get("x-forwarded-for", request.remote_addr or "?").split(",")[0]
+    _LOGIN_INTENTOS.setdefault(ip, []).append(time.time())
+
 @app.route("/api/login", methods=["POST"])
 def api_login():
+    if _login_bloqueado():
+        return jsonify({"ok": False,
+                        "error": "Demasiados intentos. Esperá unos minutos."}), 429
+
     data = request.get_json(silent=True)
     if not data or not data.get("usuario") or not data.get("password"):
         return jsonify({"ok": False, "error": "Usuario y contraseña son requeridos"}), 400
@@ -347,10 +374,13 @@ def api_login():
                             "error": "La tabla users no existe — ejecutá schema.sql en Supabase"}), 500
 
     if not resp.data:
+        _registrar_intento()
         return jsonify({"ok": False, "error": "Usuario o contraseña incorrectos"}), 401
 
     user = resp.data[0]
     if not check_password_hash(user["password_hash"], data["password"]):
+        _registrar_intento()
+        registrar_log("login_fallido", usuario)
         return jsonify({"ok": False, "error": "Usuario o contraseña incorrectos"}), 401
 
     session["auth"] = True
