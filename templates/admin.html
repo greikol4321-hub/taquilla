@@ -160,6 +160,62 @@
 
     .filtro:focus { border-color: var(--lima); }
 
+    /* ---------- Tabs ---------- */
+    .tabs {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar { display: none; }
+
+    .tab {
+        flex-shrink: 0;
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 16px;
+        background: transparent;
+        border: 1px solid var(--linea);
+        border-radius: 999px;
+        color: var(--texto-suave);
+        font-family: 'Space Mono', monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.3s var(--cubic);
+    }
+
+    .tab:hover { border-color: var(--lima); color: var(--lima); }
+
+    .tab.activo {
+        background: var(--lima);
+        border-color: var(--lima);
+        color: var(--negro);
+        font-weight: 700;
+    }
+
+    .tab .mini-count { font-size: 0.56rem; opacity: 0.75; }
+
+    /* ---------- Accesos del resumen ---------- */
+    .resumen-links {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 12px;
+    }
+
+    .resumen-link {
+        text-align: left;
+        cursor: pointer;
+        font: inherit;
+        color: inherit;
+    }
+
     /* ---------- Formularios ---------- */
     .form-row {
         display: flex;
@@ -287,7 +343,15 @@
 
 {% block content %}
 <div class="admin-grid">
-    <section class="panel" style="animation-delay:0s">
+    <nav class="tabs" role="tablist" aria-label="Secciones de administración">
+        <button type="button" class="tab activo" data-tab="resumen" role="tab" aria-selected="true">Resumen</button>
+        <button type="button" class="tab" data-tab="usuarios" role="tab" aria-selected="false">Usuarios <span class="mini-count" id="tcUsuarios">0</span></button>
+        <button type="button" class="tab" data-tab="asignaciones" role="tab" aria-selected="false">Asignaciones <span class="mini-count" id="tcAsignaciones">0</span></button>
+        <button type="button" class="tab" data-tab="eventos" role="tab" aria-selected="false">Eventos <span class="mini-count" id="tcEventos">0</span></button>
+        <button type="button" class="tab" data-tab="logs" role="tab" aria-selected="false">Logs <span class="mini-count" id="tcLogs">0</span></button>
+    </nav>
+
+    <section class="panel" data-panel="resumen">
         <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Resumen general</h2>
         <div class="stats-grid">
             <div class="stat-card"><span class="label">Entradas totales</span><span class="valor" id="stTotal">0</span><span class="detalle" id="stEventos">0 eventos</span></div>
@@ -295,9 +359,15 @@
             <div class="stat-card"><span class="label">Recaudado total</span><span class="valor mono" id="stRecTotal">₡0</span><span class="detalle" id="stPend">0 pendientes</span></div>
             <div class="stat-card"><span class="label">Recaudado usado</span><span class="valor mono" id="stRecUsadas">₡0</span><span class="detalle">efectivamente cobrado</span></div>
         </div>
+        <div class="resumen-links">
+            <button type="button" class="stat-card resumen-link" data-ir="usuarios"><span class="label">Usuarios</span><span class="valor mono" id="rUsuarios">0</span><span class="detalle">admins y staff</span></button>
+            <button type="button" class="stat-card resumen-link" data-ir="asignaciones"><span class="label">Asignaciones</span><span class="valor mono" id="rAsignaciones">0</span><span class="detalle">usuario · evento · rol</span></button>
+            <button type="button" class="stat-card resumen-link" data-ir="eventos"><span class="label">Eventos</span><span class="valor mono" id="rEventos">0</span><span class="detalle">abiertos y cerrados</span></button>
+            <button type="button" class="stat-card resumen-link" data-ir="logs"><span class="label">Actividad</span><span class="valor mono" id="rLogs">0</span><span class="detalle">registros del sistema</span></button>
+        </div>
     </section>
 
-    <section class="panel" style="animation-delay:0.02s">
+    <section class="panel" data-panel="eventos" hidden>
         <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16h8"/><path d="M7 11h12"/><path d="M7 6h3"/></svg> Eventos <span class="count" id="countEventos">0</span></h2>
 
         <form class="form-row" id="formEvento">
@@ -316,7 +386,7 @@
         </div>
     </section>
 
-    <section class="panel" style="animation-delay:0.04s">
+    <section class="panel" data-panel="usuarios" hidden>
         <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Usuarios <span class="count" id="countUsers">0</span></h2>
 
         <div class="form-user">
@@ -327,7 +397,22 @@
                 <label class="checkbox-admin"><input type="checkbox" id="uAdmin"> Es administrador</label>
                 <button class="btn-primario flex" type="submit">Crear usuario</button>
             </form>
+        </div>
 
+        <div class="tabla-wrap">
+            <table>
+                <thead>
+                    <tr><th>Usuario</th><th>Nombre</th><th>Tipo</th><th>Asignado a</th><th></th></tr>
+                </thead>
+                <tbody id="usersBody"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel" data-panel="asignaciones" hidden>
+        <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg> Asignaciones</h2>
+
+        <div class="form-user">
             <form class="form-row" id="formAsignar">
                 <select id="asignarUser"><option value="">Usuario…</option></select>
                 <select id="asignarEvento"><option value="">Evento…</option></select>
@@ -342,14 +427,14 @@
         <div class="tabla-wrap">
             <table>
                 <thead>
-                    <tr><th>Usuario</th><th>Nombre</th><th>Tipo</th><th>Asignado a</th><th></th></tr>
+                    <tr><th>Usuario</th><th>Rol</th><th>Evento</th><th></th></tr>
                 </thead>
-                <tbody id="usersBody"></tbody>
+                <tbody id="asigBody"></tbody>
             </table>
         </div>
     </section>
 
-    <section class="panel" style="animation-delay:0.06s">
+    <section class="panel" data-panel="logs" hidden>
         <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--lima)"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Registro de actividad <span class="count" id="countLogs">0</span></h2>
         <input class="filtro" id="filtroLogs" placeholder="Filtrar por usuario, acción o detalle…">
         <div class="tabla-wrap">
@@ -419,6 +504,26 @@
         return r.json();
     }
 
+    // ---------- Tabs ----------
+    function cambiarTab(nombre) {
+        if (!document.querySelector(`[data-panel="${nombre}"]`)) nombre = 'resumen';
+        document.querySelectorAll('.tab').forEach(t => {
+            const activo = t.dataset.tab === nombre;
+            t.classList.toggle('activo', activo);
+            t.setAttribute('aria-selected', activo);
+        });
+        document.querySelectorAll('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== nombre);
+        history.replaceState(null, '', '#' + nombre);
+    }
+
+    document.querySelector('.tabs').addEventListener('click', e => {
+        const btn = e.target.closest('.tab');
+        if (btn) cambiarTab(btn.dataset.tab);
+    });
+
+    document.querySelectorAll('.resumen-link').forEach(b =>
+        b.addEventListener('click', () => cambiarTab(b.dataset.ir)));
+
     // ---------- Dashboard ----------
     async function cargarDashboard() {
         const data = await api('/api/dashboard');
@@ -438,7 +543,10 @@
 
     async function cargarEventos() {
         const data = await api('/api/eventos');
-        document.getElementById('countEventos').textContent = data.eventos ? data.eventos.length : 0;
+        const n = data.eventos ? data.eventos.length : 0;
+        document.getElementById('countEventos').textContent = n;
+        document.getElementById('tcEventos').textContent = n;
+        document.getElementById('rEventos').textContent = n;
         const body = document.getElementById('eventosBody');
         body.innerHTML = '';
         if (!data.eventos || !data.eventos.length) {
@@ -463,10 +571,16 @@
     // ---------- Usuarios ----------
     async function cargarUsers() {
         const data = await api('/api/users');
-        document.getElementById('countUsers').textContent = data.users ? data.users.length : 0;
+        const users = data.users || [];
+        document.getElementById('countUsers').textContent = users.length;
+        document.getElementById('tcUsuarios').textContent = users.length;
+        document.getElementById('rUsuarios').textContent = users.length;
         const body = document.getElementById('usersBody');
+        const asigBody = document.getElementById('asigBody');
         body.innerHTML = '';
-        for (const u of data.users || []) {
+        asigBody.innerHTML = '';
+        let totalAsig = 0;
+        for (const u of users) {
             const esAdmin = u.rol === 'admin';
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -484,15 +598,30 @@
                 celdaAsig.innerHTML = '<span class="detalle">Sin asignar</span>';
             } else {
                 for (const a of u.asignaciones) {
+                    totalAsig++;
                     const chip = document.createElement('span');
                     chip.className = 'asignacion-chip';
-                    chip.innerHTML = `<span class="chip ${a.rol}">${a.rol}</span> <span></span> <button data-desasig="${u.id}" data-ev="${a.evento_id}" title="Quitar">✕</button>`;
+                    chip.innerHTML = `<span class="chip ${a.rol}">${a.rol}</span> <span></span> <button data-desasig="${u.id}" data-ev="${a.evento_id}" title="Quitar" aria-label="Quitar asignación">✕</button>`;
                     chip.querySelector('span:nth-child(2)').textContent = a.evento_nombre;
                     celdaAsig.appendChild(chip);
+
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${u.usuario}</td>
+                        <td><span class="chip ${a.rol}">${a.rol}</span></td>
+                        <td class="detalle"></td>
+                        <td><div class="acciones">
+                            <button class="btn-mini rojo" data-desasig="${u.id}" data-ev="${a.evento_id}">Quitar</button>
+                        </div></td>`;
+                    fila.querySelector('td.detalle').textContent = a.evento_nombre;
+                    asigBody.appendChild(fila);
                 }
             }
             body.appendChild(tr);
         }
+        document.getElementById('tcAsignaciones').textContent = totalAsig;
+        document.getElementById('rAsignaciones').textContent = totalAsig;
+        if (!totalAsig) asigBody.innerHTML = '<tr><td colspan="4" class="empty">Sin asignaciones</td></tr>';
     }
 
     // ---------- Logs ----------
@@ -510,7 +639,10 @@
 
     async function cargarLogs() {
         const data = await api('/api/logs');
-        document.getElementById('countLogs').textContent = data.logs ? data.logs.length : 0;
+        const total = data.logs ? data.logs.length : 0;
+        document.getElementById('countLogs').textContent = total;
+        document.getElementById('tcLogs').textContent = total;
+        document.getElementById('rLogs').textContent = total;
         const filtro = document.getElementById('filtroLogs').value.trim().toLowerCase();
         const body = document.getElementById('logsBody');
         body.innerHTML = '';
@@ -654,15 +786,24 @@
         }
     });
 
+    async function quitarAsignacion(usuarioId, eventoId) {
+        const data = await api('/api/asignar', {
+            method: 'DELETE',
+            body: JSON.stringify({ usuario_id: parseInt(usuarioId), evento_id: parseInt(eventoId) })
+        });
+        if (data.ok) { mostrarToast('Asignación quitada', 'ok'); cargarUsers(); cargarLogs(); }
+        else mostrarToast(data.error || 'Error', 'error');
+    }
+
+    document.getElementById('asigBody').addEventListener('click', e => {
+        const btn = e.target.closest('button[data-desasig]');
+        if (btn) quitarAsignacion(btn.dataset.desasig, btn.dataset.ev);
+    });
+
     document.getElementById('usersBody').addEventListener('click', async e => {
         const btnDes = e.target.closest('button[data-desasig]');
         if (btnDes) {
-            const data = await api('/api/asignar', {
-                method: 'DELETE',
-                body: JSON.stringify({ usuario_id: parseInt(btnDes.dataset.desasig), evento_id: parseInt(btnDes.dataset.ev) })
-            });
-            if (data.ok) { mostrarToast('Asignación quitada', 'ok'); cargarUsers(); cargarLogs(); }
-            else mostrarToast(data.error || 'Error', 'error');
+            quitarAsignacion(btnDes.dataset.desasig, btnDes.dataset.ev);
             return;
         }
         const btn = e.target.closest('button[data-edit], button[data-del]');
@@ -710,6 +851,7 @@
     // ---------- Init ----------
     async function init() {
         await Promise.all([cargarDashboard(), cargarEventos(), cargarUsers(), cargarLogs(), cargarSelectores()]);
+        cambiarTab(location.hash.slice(1) || 'resumen');
         const porEvento = await cargarDashboard();
         const celdas = document.querySelectorAll('#eventosBody td[data-ev-id]');
         celdas.forEach(cd => {
