@@ -41,12 +41,13 @@ except ImportError:
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://bibdstpwmtfsvbcduvey.supabase.co")
 
 # Service role key: usado server-side (bypasses RLS). Se lee de env
-# para no hardcodearlo en el repositorio. El anon key es fallback.
-_ANON_KEY = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-             "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpYmRzdHB3bXRmc3ZiY2R1dmV5Iiw"
-             "icm9sZSI6ImFub24iLCJpYXQiOjE3ODcwNzczODUsImV4cCI6MjEwMjY1MzM4NX0."
-             "5je41P3CCoHH8XeWSBKH9e9AcCM2JitJd_beHXKLSD8")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", _ANON_KEY)
+# para no hardcodearlo en el repositorio. Sin fallback: con RLS activa,
+# usar otra key fallaria en silencio; mejor arrancar con error claro.
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+if not SUPABASE_KEY:
+    raise RuntimeError(
+        "Falta SUPABASE_SERVICE_KEY en las variables de entorno. "
+        "Configurala en Vercel (production) o en .env local.")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
