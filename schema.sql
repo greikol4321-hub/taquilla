@@ -1,29 +1,47 @@
 -- ============================================================
 -- Schema: Sistema de Venta y Validacion de Entradas — Multi-Evento
 -- --------------------------------------------------------------
--- Tablas: eventos, entradas, users, logs
--- Un "admin general" gestiona varios eventos desde un solo panel.
--- Cada evento tiene su propio precio, usuarios (vendedor/portero)
--- y entradas. Los datos se filtran por evento_id en cada query.
+-- Tablas: colegios, eventos, entradas, users, evento_usuarios, logs
+--
+-- Modelo de usuarios:
+--   users.rol = 'admin'  -> administrador
+--     users.colegio_id NULL  -> admin GENERAL (ve todos los colegios)
+--     users.colegio_id = X   -> admin de ESE colegio (solo lo suyo)
+--   users.rol = NULL     -> staff (vendedor/portero) asignado a
+--                           eventos via evento_usuarios
+--
+-- Este archivo refleja el estado ACTUAL de la base: sirve para
+-- instalar desde cero. Las migraciones incrementales estan en
+-- supabase/migrations/ (aplicarlas en orden de fecha).
 -- ============================================================
 
 -- 1) Extension para busqueda ILIKE '%...%' rapida
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ---------------------------------------------------------------
--- 2) Tabla de eventos (el agregador principal)
+-- 2) Tabla de colegios (multi-colegio)
+-- ---------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS colegios (
+    id        SERIAL PRIMARY KEY,
+    nombre    TEXT NOT NULL UNIQUE,
+    creado_en TIMESTAMPTZ DEFAULT now()
+);
+
+-- ---------------------------------------------------------------
+-- 3) Tabla de eventos (el agregador principal)
 -- ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS eventos (
     id              SERIAL PRIMARY KEY,
     nombre          TEXT NOT NULL UNIQUE,
     precio_entrada  INTEGER NOT NULL DEFAULT 1000 CHECK (precio_entrada >= 0),
     activo          BOOLEAN DEFAULT true,
+    colegio_id      INTEGER REFERENCES colegios(id) ON DELETE SET NULL,
     creado_en       TIMESTAMPTZ DEFAULT now(),
     updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
 -- ---------------------------------------------------------------
--- 3) Tabla de entradas (asociada a un evento)
+-- 4) Tabla de entradas (asociada a un evento)
 -- ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS entradas (
     id          SERIAL PRIMARY KEY,
@@ -32,6 +50,7 @@ CREATE TABLE IF NOT EXISTS entradas (
     nombre      TEXT NOT NULL,
     cedula      TEXT NOT NULL,
     precio      INTEGER DEFAULT 0,
+    vendedor    TEXT,
     evento_id   INTEGER NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
     creado_en   TIMESTAMPTZ DEFAULT now(),
     updated_at  TIMESTAMPTZ DEFAULT now(),
@@ -43,28 +62,32 @@ CREATE TABLE IF NOT EXISTS entradas (
 );
 
 -- ---------------------------------------------------------------
--- 4) Tabla de usuarios (rol por evento; admin global = evento_id NULL)
+-- 5) Tabla de usuarios (global; el staff se asigna por evento)
 -- ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
     id            SERIAL PRIMARY KEY,
     usuario       TEXT NOT NULL,
     password_hash TEXT NOT NULL,
-    rol           TEXT NOT NULL CHECK (rol IN ('vendedor', 'portero', 'admin')),
+    rol           TEXT CHECK (rol = 'admin' OR rol IS NULL),
     nombre        TEXT DEFAULT '',
-    evento_id     INTEGER REFERENCES eventos(id) ON DELETE SET NULL,
+    colegio_id    INTEGER REFERENCES colegios(id) ON DELETE SET NULL,
     creado_en     TIMESTAMPTZ DEFAULT now(),
     updated_at    TIMESTAMPTZ DEFAULT now()
 );
 
--- Unique parciales: admins globales (evento_id IS NULL) unicos por usuario;
--- usuarios por evento unicos por (evento_id, usuario)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_usuario_global
-    ON users (usuario) WHERE evento_id IS NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_users_usuario_evento
-    ON users (evento_id, usuario) WHERE evento_id IS NOT NULL;
+-- ---------------------------------------------------------------
+-- 6) Tabla de asignacion usuario <-> evento (staff)
+-- ---------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS evento_usuarios (
+    evento_id   INTEGER NOT NULL REFERENCES eventos(id) ON DELETE CASCADE,
+    usuario_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rol         TEXT NOT NULL CHECK (rol IN ('vendedor', 'portero')),
+    creado_en   TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (evento_id, usuario_id)
+);
 
 -- ---------------------------------------------------------------
--- 5) Tabla de logs (asociada a un evento; NULL = admin global)
+-- 7) Tabla de logs (registro de actividad; evento_id NULL = admin)
 -- ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS logs (
     id          SERIAL PRIMARY KEY,
@@ -76,29 +99,93 @@ CREATE TABLE IF NOT EXISTS logs (
 );
 
 -- ---------------------------------------------------------------
--- 6) Datos iniciales
+-- 8) Indices
 -- ---------------------------------------------------------------
--- Evento por defecto (el que se usaba antes como "Baile CTPM 2026")
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_usuario
+    ON users (usuario);
+CREATE INDEX IF NOT EXISTS idx_users_colegio
+    ON users (colegio_id);
+CREATE INDEX IF NOT EXISTS idx_eventos_colegio
+    ON eventos (colegio_id);
+
+-- Entradas: conteos del dashboard, validacion en puerta y stats por vendedor
+CREATE INDEX IF NOT EXISTS idx_entradas_evento_usado
+    ON entradas (evento_id, usado);
+CREATE INDEX IF NOT EXISTS idx_entradas_evento_vendedor
+    ON entradas (evento_id, vendedor);
+CREATE INDEX IF NOT EXISTS idx_entradas_nombre_trgm
+    ON entradas USING GIN (nombre gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_entradas_cedula_trgm
+    ON entradas USING GIN (cedula gin_trgm_ops);
+
+-- Logs: listado por evento y actividad reciente
+CREATE INDEX IF NOT EXISTS idx_logs_evento_id
+    ON logs (evento_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_logs_creado
+    ON logs (creado_en DESC);
+
+-- Asignaciones en ambas direcciones
+CREATE INDEX IF NOT EXISTS idx_asignaciones_usuario
+    ON evento_usuarios (usuario_id);
+CREATE INDEX IF NOT EXISTS idx_asignaciones_evento
+    ON evento_usuarios (evento_id);
+
+-- ---------------------------------------------------------------
+-- 9) updated_at automatico + proteccion del ultimo admin
+-- ---------------------------------------------------------------
+CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_entradas_updated ON entradas;
+CREATE TRIGGER trg_entradas_updated BEFORE UPDATE ON entradas
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_users_updated ON users;
+CREATE TRIGGER trg_users_updated BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_eventos_updated ON eventos;
+CREATE TRIGGER trg_eventos_updated BEFORE UPDATE ON eventos
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE OR REPLACE FUNCTION proteger_ultimo_admin() RETURNS trigger AS $$
+DECLARE
+    admins INT;
+BEGIN
+    IF TG_OP = 'DELETE' AND OLD.rol = 'admin' THEN
+        SELECT count(*) INTO admins FROM users WHERE rol = 'admin';
+        IF admins <= 1 THEN
+            RAISE EXCEPTION 'No se puede borrar al ultimo admin';
+        END IF;
+    END IF;
+    IF TG_OP = 'UPDATE' AND OLD.rol = 'admin' AND NEW.rol IS DISTINCT FROM 'admin' THEN
+        SELECT count(*) INTO admins FROM users WHERE rol = 'admin';
+        IF admins <= 1 THEN
+            RAISE EXCEPTION 'No se puede degradar al ultimo admin';
+        END IF;
+    END IF;
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_users_proteger_admin ON users;
+CREATE TRIGGER trg_users_proteger_admin BEFORE UPDATE OR DELETE ON users
+    FOR EACH ROW EXECUTE FUNCTION proteger_ultimo_admin();
+
+-- ---------------------------------------------------------------
+-- 10) Datos iniciales
+-- ---------------------------------------------------------------
+-- Evento por defecto
 INSERT INTO eventos (nombre, precio_entrada)
     VALUES ('Baile CTPM 2026', 1000)
     ON CONFLICT (nombre) DO NOTHING;
 
--- Admin global (evento_id = NULL → acceso a todos los eventos)
-INSERT INTO users (usuario, password_hash, rol, nombre, evento_id)
+-- Admin GENERAL (colegio_id = NULL -> controla todos los colegios)
+INSERT INTO users (usuario, password_hash, rol, nombre)
     VALUES ('admin', 'scrypt:32768:8:1$uDAYSjOA6oLsc0xo$eb8c27961fa79fccc48234860ce9cd260b6b8d47817a1e7363d6fed5e4e671e8ee0e5e8439a6b727dc7c69a0076e8497468871d5db75ed26550e54ecc979adb6',
-            'admin', 'Admin', NULL)
-    ON CONFLICT (usuario) DO UPDATE
-        SET rol = EXCLUDED.rol, evento_id = NULL
-        WHERE users.rol IS DISTINCT FROM EXCLUDED.rol
-           OR users.evento_id IS DISTINCT FROM EXCLUDED.evento_id;
-
--- Usuarios por evento (asociados al evento por defecto)
-INSERT INTO users (usuario, password_hash, rol, nombre, evento_id)
-    VALUES
-        ('vendedor', 'scrypt:32768:8:1$gmBfKNaZHR4ztQQX$7c6a66e56ca8493345fe28aa512685bf05258a0487322ff7a6233055a6e838a2c73f0b66f0a57c7551ada20e845b96f4fff86c6d993aba3cb3bbaa7fa875253f',
-         'vendedor', 'Vendedor', 1),
-        ('portero',  'scrypt:32768:8:1$CAxlpGgoLdDmPW5n$66d9bff05013c75c21351f4eda3be7d5cbf7d72f56304b0b688502583667a251c265eeeb280b0dfa78b3859635adb626924e3ed3eb641e2068b297a07ed28c97',
-         'portero', 'Portero', 1)
-    ON CONFLICT (usuario) DO UPDATE
-        SET evento_id = EXCLUDED.evento_id
-        WHERE users.evento_id IS DISTINCT FROM EXCLUDED.evento_id;
+            'admin', 'Admin')
+    ON CONFLICT (usuario) DO NOTHING;
