@@ -809,8 +809,23 @@
                     {% if not es_general %}
                     <button type="button" class="stat-card resumen-link" data-ir="eventos"><span class="label">Eventos</span><span class="valor mono" id="rEventos">0</span><span class="detalle">abiertos y cerrados</span></button>
                     {% endif %}
+                    {% if es_general %}
                     <button type="button" class="stat-card resumen-link" data-ir="logs"><span class="label">Actividad</span><span class="valor mono" id="rLogs">0</span><span class="detalle">registros del sistema</span></button>
+                    {% endif %}
                 </div>
+
+                {% if not es_general %}
+                <div style="margin-top:22px; padding-top:18px; border-top: 1px solid var(--linea); display:flex; gap:10px; align-items:end; flex-wrap:wrap;">
+                    <div class="field" style="flex:1; min-width: 200px; margin:0;">
+                        <label for="excelEventoCole">Exportar Excel</label>
+                        <select id="excelEventoCole"><option value="">Todos mis eventos</option></select>
+                    </div>
+                    <button class="btn-primario" id="btnExcelCole" style="width:auto; padding: 12px 20px; font-size:0.78rem; white-space:nowrap; display:flex; align-items:center; gap:8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        Descargar Excel
+                    </button>
+                </div>
+                {% endif %}
             </div>
         </section>
 
@@ -1008,6 +1023,17 @@
         <section class="card" data-panel="finanzas" hidden>
             <div class="card-in">
                 <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Finanzas por colegio y evento</h2>
+
+                <div style="display:flex; gap:10px; align-items:end; margin-bottom: 18px; flex-wrap:wrap;">
+                    <div class="field" style="flex:1; min-width: 200px; margin:0;">
+                        <label for="excelColegio">Exportar Excel</label>
+                        <select id="excelColegio"><option value="">Todos los colegios</option></select>
+                    </div>
+                    <button class="btn-primario" id="btnExcel" style="width:auto; padding: 12px 20px; font-size:0.78rem; white-space:nowrap; display:flex; align-items:center; gap:8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        Descargar Excel
+                    </button>
+                </div>
 
                 <div class="stats-grid">
                     <div class="stat-card"><span class="label">Recaudado total</span><span class="valor mono" id="finTotal">₡0</span><span class="detalle" id="finColegios">0 colegios</span></div>
@@ -2005,13 +2031,87 @@
 
     document.getElementById('filtroLogs').addEventListener('input', cargarLogs);
 
+    // ---------- Excel export ----------
+    async function initExcelExports() {
+        // General: poblar filtro por colegio
+        const selColegio = document.getElementById('excelColegio');
+        if (selColegio && ES_GENERAL) {
+            try {
+                const d = await api('/api/colegios');
+                const cur = selColegio.value;
+                selColegio.innerHTML = '<option value="">Todos los colegios</option>';
+                (d.colegios || []).forEach(c => {
+                    const o = document.createElement('option'); o.value = c.id; o.textContent = c.nombre;
+                    selColegio.appendChild(o);
+                });
+                selColegio.value = cur;
+            } catch {}
+        }
+        // Cole: poblar filtro por evento
+        const selEvento = document.getElementById('excelEventoCole');
+        if (selEvento && !ES_GENERAL) {
+            try {
+                const d = await api('/api/eventos');
+                const cur = selEvento.value;
+                selEvento.innerHTML = '<option value="">Todos mis eventos</option>';
+                (d.eventos || []).forEach(ev => {
+                    const o = document.createElement('option'); o.value = ev.id; o.textContent = ev.nombre;
+                    selEvento.appendChild(o);
+                });
+                selEvento.value = cur;
+            } catch {}
+        }
+    }
+    async function descargarExcel(url) {
+        try {
+            const r = await fetch(url);
+            if (!r.ok) {
+                let msg = 'Error al exportar';
+                try { const j = await r.json(); msg = j.error || msg; } catch {}
+                mostrarToast(msg, 'error');
+                return;
+            }
+            const blob = await r.blob();
+            const disp = r.headers.get('Content-Disposition') || '';
+            let filename = 'taquilla.xlsx';
+            const m = disp.match(/filename="?([^"]+)"?/);
+            if (m) filename = m[1];
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+            mostrarToast('Excel descargado', 'ok');
+        } catch (e) {
+            mostrarToast('Error al descargar', 'error');
+        }
+    }
+    document.getElementById('btnExcel')?.addEventListener('click', () => {
+        const v = document.getElementById('excelColegio')?.value;
+        const url = v ? `/api/exportar/excel?colegio_id=${encodeURIComponent(v)}` : '/api/exportar/excel';
+        descargarExcel(url);
+    });
+    document.getElementById('btnExcelCole')?.addEventListener('click', () => {
+        const v = document.getElementById('excelEventoCole')?.value;
+        const url = v ? `/api/exportar/excel?evento_id=${encodeURIComponent(v)}` : '/api/exportar/excel';
+        descargarExcel(url);
+    });
+
     // ---------- Init ----------
     async function init() {
         await Promise.all([cargarEventos(), cargarUsers(), cargarLogs(), cargarSelectores(), cargarColegios()]);
         await cargarDashboard();
+        await initExcelExports();
         const tabInicial = location.hash.slice(1) || 'resumen';
         cambiarTab(tabInicial);
         if (tabInicial === 'finanzas') { finanzasCargadas = true; cargarFinanzas(); }
+        // Refrescar filtros de Excel al cambiar de pestaña
+        document.querySelectorAll('[data-tab]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.dataset.tab === 'finanzas' || btn.dataset.tab === 'resumen') setTimeout(initExcelExports, 300);
+            });
+        });
     }
 
     init();

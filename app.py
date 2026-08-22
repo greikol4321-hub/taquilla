@@ -23,6 +23,9 @@ import time
 import uuid
 import io
 import csv
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from functools import wraps
 from flask import (Flask, request, jsonify, render_template,
                    session, redirect, url_for, Response)
@@ -837,6 +840,273 @@ def api_exportar():
     response = Response(output.getvalue(), mimetype="text/csv")
     response.headers["Content-Disposition"] = "attachment; filename=entradas.csv"
     return response
+
+
+@app.route("/api/exportar/excel")
+def api_exportar_excel():
+    """Excel estilizado Taquilla — con colores por colegio, orden y resumen."""
+    if not session.get("auth"):
+        return jsonify({"ok": False, "error": "No autorizado"}), 401
+
+    rol = session.get("rol")
+    # Determinar alcance según rol
+    if rol == "admin":
+        eventos = eventos_visibles(desc=False)
+        ev_ids = [e["id"] for e in eventos]
+        # Filtros opcionales: colegio (general) y evento (general/cole)
+        filtro_colegio = request.args.get("colegio_id", type=int)
+        if filtro_colegio is not None and es_admin_general():
+            ev_ids = [e["id"] for e in eventos if e.get("colegio_id") == filtro_colegio]
+            eventos = [e for e in eventos if e.get("colegio_id") == filtro_colegio]
+        filtro_evento = request.args.get("evento_id", type=int)
+        if filtro_evento is not None:
+            if filtro_evento not in ev_ids:
+                return jsonify({"ok": False, "error": "Evento no encontrado o sin permiso"}), 404
+            ev_ids = [filtro_evento]
+            eventos = [e for e in eventos if e["id"] == filtro_evento]
+        if not ev_ids:
+            ev_ids = [-1]  # para que no traiga nada si no hay eventos
+    else:
+        # vendedor / portero: solo su evento activo
+        evento_id = session.get("evento_id")
+        if not evento_id:
+            return jsonify({"ok": False, "error": "Seleccioná un evento"}), 400
+        ev_ids = [evento_id]
+        eventos = eventos_visibles(desc=False)
+        filtro_colegio = None
+
+    # Datos de colegios para colores
+    try:
+        cols = supabase.table(TABLA_COLEGIOS).select("id,nombre,color").execute().data or []
+    except Exception:
+        cols = []
+    mapa_colegio = {c["id"]: c for c in cols}
+    mapa_evento = {e["id"]: e for e in eventos}
+    # Fallback para eventos que no están en eventos_visibles pero sí en entradas (por si acaso)
+    try:
+        ev_rows = supabase.table(TABLA_EVENTOS).select("id,nombre,colegio_id,precio_entrada").in_("id", ev_ids).execute().data or []
+        for er in ev_rows:
+            if er["id"] not in mapa_evento:
+                mapa_evento[er["id"]] = er
+    except Exception:
+        pass
+
+    # Traer entradas
+    try:
+        # Supabase limita a 1000 por defecto, paginar si hace falta
+        entradas = []
+        offset = 0
+        while True:
+            batch = supabase.table(TABLA).select(
+                "id,codigo,nombre,cedula,usado,precio,vendedor,creado_en,evento_id"
+            ).in_("evento_id", ev_ids).order("id").range(offset, offset+999).execute().data or []
+            entradas.extend(batch)
+            if len(batch) < 1000:
+                break
+            offset += 1000
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    # Ordenar por colegio > evento > usado > nombre (para que se vea ordenado)
+    def sort_key(r):
+        ev = mapa_evento.get(r["evento_id"], {})
+        col_id = ev.get("colegio_id")
+        col_nombre = mapa_colegio.get(col_id, {}).get("nombre", "Global") if col_id else "Global"
+        return (col_nombre, ev.get("nombre",""), 0 if r.get("usado") else 1, r.get("nombre") or "")
+    entradas.sort(key=sort_key)
+
+    # Estadísticas
+    total = len(entradas)
+    usadas = sum(1 for r in entradas if r.get("usado"))
+    pendientes = total - usadas
+    # Recaudado: sumar precio por entrada (usando precio de la entrada o del evento)
+    def precio_de(r):
+        return r.get("precio") or mapa_evento.get(r["evento_id"], {}).get("precio_entrada") or 0
+    recaudado = sum(precio_de(r) for r in entradas)
+
+    # Crear workbook
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Entradas"
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+
+    # Estilos
+    NEGRO = "0B0B0F"
+    NEGRO2 = "12121A"
+    LIMA = "D9FF3D"
+    TEXTO = "ECEBE6"
+    SUAVE = "8B8A94"
+    BLANCO = "FFFFFF"
+    thin_border = Border(
+        left=Side(style="thin", color="2A2A30"),
+        right=Side(style="thin", color="2A2A30"),
+        top=Side(style="thin", color="2A2A30"),
+        bottom=Side(style="thin", color="2A2A30"),
+    )
+    header_fill = PatternFill(start_color=NEGRO, end_color=NEGRO, fill_type="solid")
+    header_font = Font(name="Karla", size=8, bold=True, color=LIMA)
+    title_font = Font(name="Archivo Black", size=14, bold=True, color=NEGRO)
+    title_fill = PatternFill(start_color=LIMA, end_color=LIMA, fill_type="solid")
+    sub_font = Font(name="Space Mono", size=8, color=SUAVE)
+    cell_font = Font(name="Karla", size=8, color=TEXTO)
+    mono_font = Font(name="Space Mono", size=7, color=TEXTO)
+    alt_fill = PatternFill(start_color=NEGRO2, end_color=NEGRO2, fill_type="solid")
+    even_fill = PatternFill(start_color=NEGRO, end_color=NEGRO, fill_type="solid")
+
+    # Título
+    ws.merge_cells("A1:I1")
+    c = ws["A1"]
+    c.value = "TAQUILLA — Reporte de Entradas"
+    c.font = title_font
+    c.fill = title_fill
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 28
+
+    # Subtítulo con fecha y alcance
+    ws.merge_cells("A2:I2")
+    c = ws["A2"]
+    alcance_txt = "Todos los colegios" if (rol=="admin" and not session.get("colegio_id") and not filtro_colegio) else (mapa_colegio.get(filtro_colegio, {}).get("nombre") if filtro_colegio else (mapa_colegio.get(session.get("colegio_id"), {}).get("nombre") or "Mi colegio" if rol=="admin" and session.get("colegio_id") else session.get("evento_nombre") or "Reporte"))
+    c.value = f"{alcance_txt}  •  {time.strftime('%d/%m/%Y %H:%M')}  •  {total} entradas  •  {usadas} usadas  •  {pendientes} pendientes  •  ₡{recaudado:,}".replace(",", ".")
+    c.font = sub_font
+    c.fill = PatternFill(start_color="1A1A22", end_color="1A1A22", fill_type="solid")
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[2].height = 18
+
+    # Resumen en 3 cajitas (fila 3)
+    resumen = [
+        ("Total vendidas", str(total), "entradas"),
+        ("Asistieron", f"{usadas} ({round(usadas/total*100) if total else 0}%)", "usadas"),
+        ("Recaudado", f"₡{recaudado:,}".replace(",", "."), "total"),
+    ]
+    for idx, (label, val, det) in enumerate(resumen, start=1):
+        col = (idx-1)*3 + 1
+        ws.merge_cells(start_row=3, start_column=col, end_row=3, end_column=col+2)
+        c = ws.cell(row=3, column=col)
+        c.value = f"{label}: {val} {det}"
+        c.font = Font(name="Space Mono", size=7, bold=True, color=NEGRO)
+        # Color por resumen: lima, celeste, gris
+        fills = [LIMA, "5AA9FF", "8A8F98"]
+        c.fill = PatternFill(start_color=fills[idx-1], end_color=fills[idx-1], fill_type="solid")
+        c.alignment = Alignment(horizontal="center", vertical="center")
+        c.border = thin_border
+    ws.row_dimensions[3].height = 16
+
+    # Cabecera de tabla (fila 5)
+    headers = ["#", "Código", "Nombre", "Cédula", "Evento", "Colegio", "Precio", "Estado", "Vendedor / Fecha"]
+    col_widths = [5, 12, 22, 14, 20, 18, 9, 10, 22]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    header_row = 5
+    for col, h in enumerate(headers, 1):
+        c = ws.cell(row=header_row, column=col, value=h)
+        c.font = header_font
+        c.fill = header_fill
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = thin_border
+    ws.row_dimensions[header_row].height = 20
+
+    # Filas
+    row_idx = header_row + 1
+    for idx, r in enumerate(entradas, 1):
+        ev = mapa_evento.get(r["evento_id"], {})
+        col_id = ev.get("colegio_id")
+        col_info = mapa_colegio.get(col_id) if col_id else None
+        colegio_nombre = col_info["nombre"] if col_info else ("Global" if ev else "—")
+        colegio_color = (col_info["color"] if col_info and col_info.get("color") else ("#8A8F98" if colegio_nombre!="Global" else "#D9FF3D")).lstrip("#")
+        estado = "Usada" if r.get("usado") else "Pendiente"
+        precio = precio_de(r)
+        # Color sutil por colegio en la primera columna
+        is_alt = idx % 2 == 0
+        fill = alt_fill if is_alt else even_fill
+
+        vals = [
+            idx,
+            r.get("codigo",""),
+            r.get("nombre","") or "—",
+            r.get("cedula","") or "—",
+            ev.get("nombre","") or "—",
+            colegio_nombre,
+            f"₡{precio:,}".replace(",", "."),
+            estado,
+            f"{r.get('vendedor','—')}  {r.get('creado_en','')[:10]}",
+        ]
+        for col, val in enumerate(vals, 1):
+            c = ws.cell(row=row_idx, column=col, value=val)
+            c.font = mono_font if col in (2,4,7,8) else cell_font
+            c.fill = fill
+            c.border = thin_border
+            c.alignment = Alignment(horizontal="center" if col in (1,7,8) else "left", vertical="center")
+            if col == 1:
+                # Indicador de colegio
+                c.fill = PatternFill(start_color=colegio_color, end_color=colegio_color, fill_type="solid")
+                c.font = Font(name="Karla", size=7, bold=True, color=NEGRO if colegio_color.upper() in ("D9FF3D","5AA9FF","FFB84D") else BLANCO)
+                c.alignment = Alignment(horizontal="center", vertical="center")
+        # Color de estado
+        estado_cell = ws.cell(row=row_idx, column=8)
+        if r.get("usado"):
+            estado_cell.fill = PatternFill(start_color="1E3A28", end_color="1E3A28", fill_type="solid")
+            estado_cell.font = Font(name="Karla", size=7, bold=True, color="7EE787")
+        else:
+            estado_cell.fill = PatternFill(start_color="2A2A1E", end_color="2A2A1E", fill_type="solid")
+            estado_cell.font = Font(name="Karla", size=7, bold=True, color="FFD966")
+        ws.row_dimensions[row_idx].height = 16
+        row_idx += 1
+
+    if total == 0:
+        ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=9)
+        c = ws.cell(row=row_idx, column=1, value="Sin entradas para este filtro")
+        c.font = Font(name="Space Mono", size=9, italic=True, color=SUAVE)
+        c.alignment = Alignment(horizontal="center")
+        row_idx += 1
+
+    # Totales al pie
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=6)
+    c = ws.cell(row=row_idx, column=1, value="TOTALES")
+    c.font = Font(name="Karla", size=8, bold=True, color=LIMA)
+    c.fill = header_fill
+    c.alignment = Alignment(horizontal="right", vertical="center")
+    c.border = thin_border
+    for col in range(2,7):
+        cc = ws.cell(row=row_idx, column=col)
+        cc.fill = header_fill
+        cc.border = thin_border
+    ws.cell(row=row_idx, column=7, value=f"₡{recaudado:,}".replace(",", ".")).font = Font(name="Space Mono", size=8, bold=True, color=BLANCO)
+    ws.cell(row=row_idx, column=7).fill = header_fill
+    ws.cell(row=row_idx, column=7).alignment = Alignment(horizontal="center", vertical="center")
+    ws.cell(row=row_idx, column=7).border = thin_border
+    ws.cell(row=row_idx, column=8, value=f"{usadas}/{total}").font = Font(name="Karla", size=8, bold=True, color=BLANCO)
+    ws.cell(row=row_idx, column=8).fill = header_fill
+    ws.cell(row=row_idx, column=8).alignment = Alignment(horizontal="center", vertical="center")
+    ws.cell(row=row_idx, column=8).border = thin_border
+    ws.cell(row=row_idx, column=9, value=time.strftime("%d/%m/%Y")).font = Font(name="Space Mono", size=7, color=SUAVE)
+    ws.cell(row=row_idx, column=9).fill = header_fill
+    ws.cell(row=row_idx, column=9).alignment = Alignment(horizontal="center", vertical="center")
+    ws.cell(row=row_idx, column=9).border = thin_border
+    ws.row_dimensions[row_idx].height = 18
+
+    # Ajustes finales
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.print_title_rows = "1:5"
+
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+
+    registrar_log("exportar_excel", f"{total} filas → {alcance_txt}")
+
+    filename = f"taquilla_{alcance_txt.lower().replace(' ', '_')}_{time.strftime('%Y%m%d')}.xlsx"
+    # Limpiar nombre
+    filename = re.sub(r"[^a-z0-9_\-\.]", "_", filename)
+
+    return Response(
+        out.getvalue(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 # -----------------------------------------------------------
