@@ -1140,7 +1140,7 @@
         for (const ev of data.eventos) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="font-family:'Space Mono',monospace;font-size:0.7rem">${ev.nombre}</td>
+                <td style="font-family:'Space Mono',monospace;font-size:0.7rem">${esc(ev.nombre)}</td>
                 <td><span class="chip">₡${ev.precio_entrada}</span></td>
                 <td><span class="chip ${ev.activo ? '' : 'badge-pendiente'}">${ev.activo ? 'Abierto' : 'Cerrado'}</span></td>
                 <td class="fecha" data-ev-id="${ev.id}">—</td>
@@ -1239,7 +1239,7 @@
             for (const a of admins) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${a.usuario}</td>
+                    <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${esc(a.usuario)}</td>
                     <td class="detalle"></td>
                     <td><div class="acciones">
                         ${a.colegio_id ? `<button class="btn-mini rojo" data-quitar-colegio="${a.id}">Quitar del colegio</button>` : '<span class="detalle">—</span>'}
@@ -1270,7 +1270,7 @@
             const esAdmin = u.rol === 'admin';
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${u.usuario}</td>
+                <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${esc(u.usuario)}</td>
                 <td class="detalle" style="max-width:140px"></td>
                 <td><span class="chip ${esAdmin ? 'admin' : ''}">${esAdmin ? 'Admin' : 'Staff'}</span></td>
                 <td class="acciones-asig" style="max-width:200px"></td>
@@ -1294,7 +1294,7 @@
                     if (!asigBody) continue;
                     const fila = document.createElement('tr');
                     fila.innerHTML = `
-                        <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${u.usuario}</td>
+                        <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${esc(u.usuario)}</td>
                         <td><span class="chip ${a.rol}">${a.rol}</span></td>
                         <td class="detalle"></td>
                         <td><div class="acciones">
@@ -1358,10 +1358,10 @@
                 body.innerHTML = '';
                 (data.colegios || []).forEach(c => {
                     const tr = document.createElement('tr');
-                    tr.innerHTML = `<td><strong>${c.nombre}</strong></td>
+                    tr.innerHTML = `<td><strong>${esc(c.nombre)}</strong></td>
                         <td>${c.eventos ?? 0}</td>
                         <td>${c.usuarios ?? 0}</td>
-                        <td><div class="acciones"><button class="btn-mini rojo" data-borrar-colegio="${c.id}" data-nombre="${c.nombre}">Borrar</button></div></td>`;
+                        <td><div class="acciones"><button class="btn-mini rojo" data-borrar-colegio="${c.id}" data-nombre="${esc(c.nombre)}">Borrar</button></div></td>`;
                     body.appendChild(tr);
                 });
                 const n = (data.colegios || []).length;
@@ -1619,6 +1619,10 @@
         return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
 
+    // Escapa datos de usuario antes de interpolarlos en innerHTML (XSS)
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
     async function cargarLogs() {
         const data = await api('/api/logs');
         const logs = data.logs || [];
@@ -1643,7 +1647,7 @@
                     <td class="fecha">${formatearFecha(l.creado_en)}</td>
                     <td><span class="chip ${chipClase(l.accion)}">${ACCIONES[l.accion] || l.accion}</span></td>
                     <td class="detalle"></td>
-                    <td style="font-family:'Space Mono',monospace;font-size:0.66rem;white-space:nowrap">${l.usuario || ''}</td>`;
+                    <td style="font-family:'Space Mono',monospace;font-size:0.66rem;white-space:nowrap">${esc(l.usuario || '')}</td>`;
                 tr.querySelector('.detalle').textContent = l.detalle || '';
                 body.appendChild(tr);
             }

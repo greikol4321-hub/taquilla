@@ -305,6 +305,10 @@
         return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
+    // Escapa datos de usuario antes de interpolarlos en innerHTML (XSS)
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
     function renderTabla() {
         const filtro = document.getElementById('busqueda').value.trim().toUpperCase();
         const filas = entradas.filter(e => !filtro ||
@@ -324,9 +328,9 @@
             <tr>
                 <td class="codigo-cell">${e.codigo}</td>
                 <td class="comprador-cell">
-                    <div class="comprador-nombre">${e.nombre || '—'}</div>
-                    <div class="comprador-cedula">CI ${e.cedula || '—'}</div>
-                    ${e.vendedor ? `<div class="comprador-cedula">vendió ${e.vendedor}</div>` : ''}
+                    <div class="comprador-nombre">${esc(e.nombre || '—')}</div>
+                    <div class="comprador-cedula">CI ${esc(e.cedula || '—')}</div>
+                    ${e.vendedor ? `<div class="comprador-cedula">vendió ${esc(e.vendedor)}</div>` : ''}
                 </td>
                 <td><span class="badge ${e.usado ? 'badge-usado' : 'badge-pendiente'}">${e.usado ? 'Usado' : 'Pendiente'}</span></td>
                 <td class="fecha-cell">${formatearFecha(e.creado_en)}</td>

@@ -366,12 +366,26 @@
                 datos.className = 'datos-validados';
                 if (nombre) {
                     const lineaNombre = document.createElement('div');
-                    lineaNombre.innerHTML = '<span class="dato-label">Comprador</span><span class="dato-valor" id="datoNombre">' + nombre + '</span>';
+                    const lblN = document.createElement('span');
+                    lblN.className = 'dato-label';
+                    lblN.textContent = 'Comprador';
+                    const valN = document.createElement('span');
+                    valN.className = 'dato-valor';
+                    valN.id = 'datoNombre';
+                    valN.textContent = nombre;
+                    lineaNombre.append(lblN, valN);
                     datos.appendChild(lineaNombre);
                 }
                 if (cedula) {
                     const lineaCedula = document.createElement('div');
-                    lineaCedula.innerHTML = '<span class="dato-label">Cédula</span><span class="dato-valor" id="datoCedula">' + cedula + '</span>';
+                    const lblC = document.createElement('span');
+                    lblC.className = 'dato-label';
+                    lblC.textContent = 'Cédula';
+                    const valC = document.createElement('span');
+                    valC.className = 'dato-valor';
+                    valC.id = 'datoCedula';
+                    valC.textContent = cedula;
+                    lineaCedula.append(lblC, valC);
                     datos.appendChild(lineaCedula);
                 }
                 resultado.appendChild(datos);
