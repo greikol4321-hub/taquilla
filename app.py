@@ -104,8 +104,20 @@ def inject_evento():
 # Helpers
 # -----------------------------------------------------------
 def validar_cedula(cedula):
-    """Valida formato de cedula costa-ricense: X-XXXX-XXXX"""
-    return bool(CEDULA_CR.match(cedula.strip()))
+    """Valida formato de cedula costa-ricense: X-XXXX-XXXX. Vacía es válida (opcional)."""
+    cedula = cedula.strip()
+    if not cedula:
+        return True
+    return bool(CEDULA_CR.match(cedula))
+
+
+def cedula_para_mostrar(cedula):
+    """Para display: placeholders __empty__ -> ''."""
+    if not cedula:
+        return ""
+    if isinstance(cedula, str) and cedula.startswith("__empty__"):
+        return ""
+    return cedula
 
 
 def evento_acts():
@@ -150,10 +162,11 @@ def entrada_duplicada(nombre, cedula, evento_id):
         .ilike("nombre", escapar(nombre)).limit(1).execute()
     if r1.data:
         return "nombre"
-    r2 = supabase.table(TABLA).select("id").eq("evento_id", evento_id) \
-        .ilike("cedula", escapar(cedula)).limit(1).execute()
-    if r2.data:
-        return "cedula"
+    if cedula.strip():
+        r2 = supabase.table(TABLA).select("id").eq("evento_id", evento_id) \
+            .ilike("cedula", escapar(cedula)).limit(1).execute()
+        if r2.data:
+            return "cedula"
     return None
 
 
@@ -608,10 +621,10 @@ def api_generar():
     nombre = (data.get("nombre") or "").strip()[:80]
     cedula = (data.get("cedula") or "").strip()[:30]
 
-    if not nombre or not cedula:
-        return jsonify({"ok": False, "error": "Nombre y cédula son requeridos"}), 400
+    if not nombre:
+        return jsonify({"ok": False, "error": "Nombre es requerido"}), 400
 
-    if not validar_cedula(cedula):
+    if cedula and not validar_cedula(cedula):
         return jsonify({"ok": False,
                         "error": "Formato de cédula inválido. Usá: X-XXXX-XXXX (ej. 6-0510-0347)"}), 400
 
@@ -621,22 +634,26 @@ def api_generar():
         return jsonify({"ok": False, "error": f"Ya existe una entrada con ese {campo}"}), 409
 
     precio = session.get("precio_entrada", 0)
+    cedula_display = cedula.strip()
     for _ in range(5):
         codigo = generar_codigo()
+        # Evitar colisión de UNIQUE (evento_id, cedula) cuando cédula va vacía
+        cedula_to_store = cedula_display if cedula_display else f"__empty__{codigo}"
         try:
             resp = supabase.table(TABLA).insert({
                 "codigo": codigo,
                 "usado": False,
                 "nombre": nombre,
-                "cedula": cedula,
+                "cedula": cedula_to_store,
                 "evento_id": evento_id,
                 "precio": precio,
                 "vendedor": session.get("usuario", ""),
             }).execute()
             if resp.data:
-                registrar_log("venta", f"{nombre} | cédula {cedula} | código {codigo}")
+                log_ced = cedula_display if cedula_display else "sin cédula"
+                registrar_log("venta", f"{nombre} | cédula {log_ced} | código {codigo}")
                 return jsonify({"ok": True, "codigo": codigo, "id": resp.data[0]["id"],
-                                "nombre": nombre, "cedula": cedula, "precio": precio}), 201
+                                "nombre": nombre, "cedula": cedula_display, "precio": precio}), 201
         except Exception:
             continue
 
@@ -682,7 +699,7 @@ def api_validar():
 
     return jsonify({"ok": True, "estado": "valido", "codigo": codigo,
                     "nombre": resp.data[0].get("nombre", ""),
-                    "cedula": resp.data[0].get("cedula", "")}), 200
+                    "cedula": cedula_para_mostrar(resp.data[0].get("cedula", ""))}), 200
 
 
 # -----------------------------------------------------------
@@ -752,6 +769,8 @@ def api_listar():
         resp = supabase.table(TABLA).select(
             "id,codigo,usado,creado_en,nombre,cedula,precio,vendedor"
         ).eq("evento_id", evento_id).order("id", desc=True).limit(500).execute()
+        for r in resp.data or []:
+            r["cedula"] = cedula_para_mostrar(r.get("cedula"))
         return jsonify({"entradas": resp.data})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -832,7 +851,8 @@ def api_exportar():
     writer.writerow([])
     writer.writerow(["id", "codigo", "nombre", "cedula", "usado", "precio", "vendedor", "creado_en"])
     for row in resp.data:
-        writer.writerow([row["id"], row["codigo"], row.get("nombre", ""),
+        ced = cedula_para_mostrar(row.get("cedula", ""))
+        writer.writerow([row["id"], row["codigo"], row.get("nombre", ""), ced,
                          row.get("cedula", ""), row["usado"],
                          row.get("precio", precio), row.get("vendedor", ""),
                          row["creado_en"]])
@@ -1023,7 +1043,7 @@ def api_exportar_excel():
             idx,
             r.get("codigo",""),
             r.get("nombre","") or "—",
-            r.get("cedula","") or "—",
+            cedula_para_mostrar(r.get("cedula","")) or "—",
             ev.get("nombre","") or "—",
             colegio_nombre,
             f"₡{precio:,}".replace(",", "."),
