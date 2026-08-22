@@ -1205,8 +1205,12 @@
                 const pctUsadas = (it.usadas || 0) / maxVal * 100;
                 barras = `<div class="bar-total" style="width:${pctTotal.toFixed(1)}%;background:${colorBar}33"></div>`
                        + `<div class="bar-fill" style="width:${pctUsadas.toFixed(1)}%;background:${colorBar}"></div>`;
+            } else if (modoGrafica === 'dinero') {
+                const v = it.recaudado_total ?? 0;
+                const pct = v / maxVal * 100;
+                barras = `<div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${colorBar}"></div>`;
             } else {
-                const v = it.total ?? it.recaudado_total ?? 0;
+                const v = it.total ?? 0;
                 const pct = v / maxVal * 100;
                 barras = `<div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${colorBar}"></div>`;
             }
