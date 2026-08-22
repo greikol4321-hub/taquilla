@@ -35,9 +35,9 @@ BEGIN
   RETURN NEW;
 END $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_asignacion_colegio ON asignaciones;
+DROP TRIGGER IF EXISTS trg_asignacion_colegio ON evento_usuarios;
 CREATE TRIGGER trg_asignacion_colegio
-BEFORE INSERT OR UPDATE ON asignaciones
+BEFORE INSERT OR UPDATE ON evento_usuarios
 FOR EACH ROW EXECUTE FUNCTION validar_asignacion_colegio();
 
 -- 3. Integridad extra: el precio no puede ser negativo
