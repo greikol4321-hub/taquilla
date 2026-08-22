@@ -57,6 +57,27 @@
 
     .nav-item .mini-count { font-size: 0.56rem; opacity: 0.75; }
 
+    .alcance-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 4px;
+        padding: 8px 13px;
+        border: 1px dashed rgba(217, 255, 61, 0.35);
+        border-radius: 12px;
+        font-family: 'Space Mono', monospace;
+        font-size: 0.56rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--lima);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    @media (max-width: 899px) { .alcance-badge { display: none; } }
+
     @media (min-width: 900px) {
         .layout { grid-template-columns: 224px minmax(0, 1fr); }
         .sidenav {
@@ -259,6 +280,8 @@
     }
 
     .bar-val { font-family: 'Space Mono', monospace; font-size: 0.62rem; color: var(--texto-suave); white-space: nowrap; }
+
+    .bar-sub { font-size: 0.6rem; color: var(--texto-suave); margin-top: 4px; letter-spacing: 0.04em; }
 
     .bar-track {
         position: relative;
@@ -495,6 +518,16 @@
 
     .form-seccion { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--linea); }
 
+    /* Asignar admin↔colegio: más compacto que el resto de formularios */
+    #formAsignarColegio { max-width: 520px; }
+
+    .detalle-seccion {
+        font-size: 0.68rem;
+        color: var(--texto-suave);
+        margin: -6px 0 14px;
+        max-width: 60ch;
+    }
+
     /* ---------- Asignaciones ---------- */
     .asignacion-chip {
         display: inline-flex;
@@ -598,11 +631,25 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
             Eventos <span class="mini-count" id="tcEventos">0</span>
         </button>
-        <button type="button" class="nav-item" data-tab="logs" role="tab" aria-selected="false">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-            Logs <span class="mini-count" id="tcLogs">0</span>
+        {% if es_general %}
+        <button type="button" class="nav-item" data-tab="colegios" role="tab" aria-selected="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18"/><path d="M10 7h4"/><path d="M10 11h4"/><path d="M10 15h4"/></svg>
+            Colegios <span class="mini-count" id="tcColegios">0</span>
         </button>
-    </nav>
+        <button type="button" class="nav-item" data-tab="finanzas" role="tab" aria-selected="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Finanzas
+        </button>
+        {% endif %}
+            <button type="button" class="nav-item" data-tab="logs" role="tab" aria-selected="false">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                Logs <span class="mini-count" id="tcLogs">0</span>
+            </button>
+
+            {% if not es_general %}
+            <p class="alcance-badge"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18"/><path d="M10 7h4"/><path d="M10 11h4"/><path d="M10 15h4"/></svg> {{ colegio_nombre or "Mi colegio" }}</p>
+            {% endif %}
+        </nav>
 
     <div class="vistas">
         <!-- ============ RESUMEN ============ -->
@@ -612,9 +659,9 @@
 
                 <div class="stats-grid">
                     <div class="stat-card"><span class="label">Entradas totales</span><span class="valor" id="stTotal">0</span><span class="detalle" id="stEventos">0 eventos</span></div>
-                    <div class="stat-card"><span class="label">Usadas</span><span class="valor" id="stUsadas">0</span><span class="detalle">validadas en puerta</span></div>
-                    <div class="stat-card"><span class="label">Recaudado total</span><span class="valor mono" id="stRecTotal">₡0</span><span class="detalle" id="stPend">0 pendientes</span></div>
-                    <div class="stat-card"><span class="label">Recaudado usado</span><span class="valor mono" id="stRecUsadas">₡0</span><span class="detalle">efectivamente cobrado</span></div>
+                    <div class="stat-card"><span class="label">Asistieron</span><span class="valor" id="stUsadas">0</span><span class="detalle" id="stPend">0 pendientes de usar</span></div>
+                    <div class="stat-card"><span class="label">Vendido total</span><span class="valor mono" id="stRecTotal">₡0</span><span class="detalle">pagado al comprar</span></div>
+                    <div class="stat-card"><span class="label">Ticket promedio</span><span class="valor mono" id="stRecUsadas">₡0</span><span class="detalle">precio por entrada</span></div>
                 </div>
 
                 <div class="bento">
@@ -642,13 +689,13 @@
                     </div>
 
                     <div>
-                        <p class="chart-titulo">Recaudación</p>
+                        <p class="chart-titulo">Dinero y asistencia</p>
                         <div class="prog-nums">
-                            <div class="prog-num"><span class="label">Cobrado en puerta</span><span class="valor" id="recUsadas">₡0</span></div>
+                            <div class="prog-num"><span class="label">Asistieron</span><span class="valor" id="recUsadas">0/0</span></div>
                             <div class="prog-num"><span class="label">Vendido total</span><span class="valor" style="color:var(--texto)" id="recTotal">₡0</span></div>
                         </div>
                         <div class="prog-track"><div class="prog-fill" id="barRec"></div></div>
-                        <p class="prog-pie" id="recPct">0% cobrado</p>
+                        <p class="prog-pie" id="recPct">0% de asistencia</p>
                     </div>
 
                     <div>
@@ -656,6 +703,20 @@
                         <div class="semana" id="chartSemana"></div>
                     </div>
                 </div>
+
+                {% if es_general %}
+                <div class="por-colegio">
+                    <p class="chart-titulo">Desglose por colegio</p>
+                    <div class="tabla-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Colegio</th><th>Eventos</th><th>Entradas</th><th>Asistieron</th><th>Pendientes</th><th>Vendido</th></tr>
+                            </thead>
+                            <tbody id="colegioResumenBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
 
                 <div class="accesos">
                     <button type="button" class="stat-card resumen-link" data-ir="usuarios"><span class="label">Usuarios</span><span class="valor mono" id="rUsuarios">0</span><span class="detalle">admins y staff</span></button>
@@ -685,6 +746,12 @@
                             <label for="uPassword">Contraseña</label>
                             <input type="password" id="uPassword" placeholder="Mínimo recomendado: 8 caracteres" autocomplete="new-password">
                         </div>
+                        {% if es_general %}
+                        <div class="field">
+                            <label for="uColegio">Colegio del admin (vacío = general)</label>
+                            <select id="uColegio"><option value="">General — todos los colegios</option></select>
+                        </div>
+                        {% endif %}
                         <div class="field">
                             <label>Permisos</label>
                             <label class="checkbox-admin"><input type="checkbox" id="uAdmin"> Es administrador</label>
@@ -709,6 +776,33 @@
             <div class="card-in">
                 <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg> Asignaciones</h2>
 
+                {% if es_general %}
+                <!-- Admin general: solo asignar/quitar admins a colegios.
+                     El staff (vendedores/porteros) lo maneja cada admin de colegio. -->
+                <p class="detalle-seccion">Asigná un usuario administrador a su colegio. Los vendedores y porteros los gestiona cada admin de colegio desde su propio panel.</p>
+                <form class="form-seccion" id="formAsignarColegio">
+                    <div class="form-grid c2">
+                        <div class="field">
+                            <label for="asigAdmin">Administrador</label>
+                            <select id="asigAdmin"><option value="">Elegir…</option></select>
+                        </div>
+                        <div class="field">
+                            <label for="asigColegio">Colegio</label>
+                            <select id="asigColegio"><option value="">Sin colegio (general)</option></select>
+                        </div>
+                    </div>
+                    <button class="btn-primario" type="submit">Guardar asignación</button>
+                </form>
+
+                <div class="tabla-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Administrador</th><th>Colegio</th><th></th></tr>
+                        </thead>
+                        <tbody id="asigCoBody"></tbody>
+                    </table>
+                </div>
+                {% else %}
                 <form class="form-seccion" id="formAsignar">
                     <div class="form-grid c3">
                         <div class="field">
@@ -738,6 +832,7 @@
                         <tbody id="asigBody"></tbody>
                     </table>
                 </div>
+                {% endif %}
             </div>
         </section>
 
@@ -756,6 +851,12 @@
                             <label for="ePrecio">Precio por entrada (₡)</label>
                             <input type="number" id="ePrecio" placeholder="Ej: 1000" min="0" step="1" autocomplete="off">
                         </div>
+                        {% if es_general %}
+                        <div class="field">
+                            <label for="evColegio">Colegio del evento (vacío = global)</label>
+                            <select id="evColegio"><option value="">Global — todos los colegios</option></select>
+                        </div>
+                        {% endif %}
                     </div>
                     <button class="btn-primario" type="submit">Crear evento</button>
                 </form>
@@ -786,6 +887,54 @@
                 </div>
             </div>
         </section>
+
+        {% if es_general %}
+        <!-- ============ COLEGIOS ============ -->
+        <section class="card" data-panel="colegios" hidden>
+            <div class="card-in">
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18"/><path d="M10 7h4"/><path d="M10 11h4"/><path d="M10 15h4"/></svg> Colegios <span class="count" id="countColegios">0</span></h2>
+
+                <form class="form-seccion" id="formColegio">
+                    <div class="form-grid c2">
+                        <div class="field">
+                            <label for="colNombre">Nombre del colegio</label>
+                            <input type="text" id="colNombre" placeholder="Ej: Colegio CTPM" autocomplete="off" maxlength="80">
+                        </div>
+                    </div>
+                    <button class="btn-primario" type="submit">Crear colegio</button>
+                </form>
+
+                <div class="tabla-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Colegio</th><th>Eventos</th><th>Usuarios</th><th>Acciones</th></tr>
+                        </thead>
+                        <tbody id="colegiosBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ FINANZAS ============ -->
+        <section class="card" data-panel="finanzas" hidden>
+            <div class="card-in">
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Finanzas por colegio y evento</h2>
+
+                <p class="chart-titulo">Dinero generado por colegio (entradas vendidas)</p>
+                <div id="chartColegios"></div>
+
+                <p class="chart-titulo">Detalle: eventos de cada colegio</p>
+                <div class="tabla-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Colegio</th><th>Evento</th><th>Precio</th><th>Vendidas</th><th>Asistieron</th><th>Dinero generado</th></tr>
+                        </thead>
+                        <tbody id="finanzasBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+        {% endif %}
     </div>
 </div>
 
@@ -837,10 +986,13 @@
         'evento_crear': 'Crear evento',
         'evento_editar': 'Editar evento',
         'evento_borrar': 'Borrar evento',
-        'evento_seleccionar': 'Seleccionar evento'
+        'evento_seleccionar': 'Seleccionar evento',
+        'colegio_crear': 'Crear colegio',
+        'colegio_borrar': 'Borrar colegio'
     };
 
     const C_DONUT = 2 * Math.PI * 50;
+    const ES_GENERAL = {{ es_general | tojson }};
 
     async function api(url, opciones = {}) {
         const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opciones });
@@ -861,7 +1013,13 @@
 
     document.querySelector('.sidenav').addEventListener('click', e => {
         const btn = e.target.closest('.nav-item');
-        if (btn) cambiarTab(btn.dataset.tab);
+        if (btn) {
+            cambiarTab(btn.dataset.tab);
+            if (btn.dataset.tab === 'finanzas' && !finanzasCargadas) {
+                finanzasCargadas = true;
+                cargarFinanzas();
+            }
+        }
     });
 
     document.querySelectorAll('.resumen-link').forEach(b =>
@@ -875,9 +1033,9 @@
         document.getElementById('stTotal').textContent = g.total;
         document.getElementById('stUsadas').textContent = g.usadas;
         document.getElementById('stRecTotal').textContent = '₡' + g.recaudado_total.toLocaleString('es-CR');
-        document.getElementById('stRecUsadas').textContent = '₡' + g.recaudado_usadas.toLocaleString('es-CR');
+        document.getElementById('stRecUsadas').textContent = '₡' + (g.total ? Math.round(g.recaudado_total / g.total) : 0).toLocaleString('es-CR');
         document.getElementById('stEventos').textContent = g.eventos + ' eventos';
-        document.getElementById('stPend').textContent = (g.total - g.usadas) + ' pendientes';
+        document.getElementById('stPend').textContent = (g.total - g.usadas) + ' pendientes de usar';
 
         const pct = g.total ? Math.round(g.usadas / g.total * 100) : 0;
         document.getElementById('donutArc').style.strokeDasharray = `${C_DONUT * pct / 100} ${C_DONUT}`;
@@ -886,14 +1044,37 @@
         document.getElementById('lgPend').textContent = g.total - g.usadas;
         document.getElementById('lgTotal').textContent = g.total;
 
-        document.getElementById('recUsadas').textContent = '₡' + g.recaudado_usadas.toLocaleString('es-CR');
+        document.getElementById('recUsadas').textContent = g.usadas + '/' + g.total;
         document.getElementById('recTotal').textContent = '₡' + g.recaudado_total.toLocaleString('es-CR');
-        const pctR = g.recaudado_total ? Math.round(g.recaudado_usadas / g.recaudado_total * 100) : 0;
+        const pctR = g.total ? Math.round(g.usadas / g.total * 100) : 0;
         document.getElementById('barRec').style.width = pctR + '%';
-        document.getElementById('recPct').textContent = pctR + '% cobrado';
+        document.getElementById('recPct').textContent = pctR + '% de asistencia';
 
         pintarChartEventos(data.por_evento || []);
+        pintarPorColegio(data.por_colegio || []);
         return data.por_evento || [];
+    }
+
+    function pintarPorColegio(porColegio) {
+        const body = document.getElementById('colegioResumenBody');
+        if (!body) return;
+        body.innerHTML = '';
+        if (!porColegio.length) {
+            body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--texto-suave)">Sin colegios todavía</td></tr>';
+            return;
+        }
+        for (const c of porColegio) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong></strong></td>
+                <td>${c.eventos}</td>
+                <td>${c.total}</td>
+                <td>${c.usadas}</td>
+                <td>${c.total - c.usadas}</td>
+                <td class="mono">₡${c.recaudado_total.toLocaleString('es-CR')}</td>`;
+            tr.querySelector('strong').textContent = c.nombre;
+            body.appendChild(tr);
+        }
     }
 
     function pintarChartEventos(porEvento) {
@@ -980,7 +1161,10 @@
         if (!nombre) { mostrarToast('Ingresá un nombre para el evento', 'error'); return; }
         const data = await api('/api/eventos', {
             method: 'POST',
-            body: JSON.stringify({ nombre, precio })
+            body: JSON.stringify({
+                nombre, precio,
+                colegio_id: document.getElementById('evColegio') ? (+document.getElementById('evColegio').value || null) : null
+            })
         });
         if (data.ok) {
             document.getElementById('evNombre').value = '';
@@ -1036,8 +1220,51 @@
         document.getElementById('rUsuarios').textContent = users.length;
         const body = document.getElementById('usersBody');
         const asigBody = document.getElementById('asigBody');
+
+        if (ES_GENERAL) {
+            // Asignaciones del general: solo admins <-> colegios
+            const selAdmin = document.getElementById('asigAdmin');
+            const selColegio = document.getElementById('asigColegio');
+            const coBody = document.getElementById('asigCoBody');
+            const admins = users.filter(u => u.rol === 'admin');
+            selAdmin.innerHTML = '<option value="">Elegir…</option>';
+            for (const a of admins) {
+                const opt = document.createElement('option');
+                opt.value = a.id;
+                opt.textContent = `${a.usuario}${a.nombre ? ' — ' + a.nombre : ''}`;
+                selAdmin.appendChild(opt);
+            }
+            coBody.innerHTML = '';
+            let totalAdmCo = 0;
+            for (const a of admins) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${a.usuario}</td>
+                    <td class="detalle"></td>
+                    <td><div class="acciones">
+                        ${a.colegio_id ? `<button class="btn-mini rojo" data-quitar-colegio="${a.id}">Quitar del colegio</button>` : '<span class="detalle">—</span>'}
+                    </div></td>`;
+                tr.querySelector('td.detalle').textContent =
+                    a.colegio_id ? `Colegio #${a.colegio_id}` : 'Sin colegio (admin general)';
+                coBody.appendChild(tr);
+                if (a.colegio_id) totalAdmCo++;
+            }
+            document.getElementById('tcAsignaciones').textContent = totalAdmCo;
+            document.getElementById('rAsignaciones').textContent = totalAdmCo;
+            // nombres de colegio para la tabla
+            try {
+                const colsData = await api('/api/colegios');
+                const mapa = Object.fromEntries((colsData.colegios || []).map(c => [c.id, c.nombre]));
+                [...coBody.querySelectorAll('tr')].forEach(tr => {
+                    const td = tr.querySelector('td.detalle');
+                    const m = td.textContent.match(/Colegio #(\d+)/);
+                    if (m && mapa[m[1]]) td.textContent = mapa[m[1]];
+                });
+            } catch (e2) { /* migración pendiente */ }
+        }
+
         body.innerHTML = '';
-        asigBody.innerHTML = '';
+        if (asigBody) asigBody.innerHTML = '';
         let totalAsig = 0;
         for (const u of users) {
             const esAdmin = u.rol === 'admin';
@@ -1064,6 +1291,7 @@
                     chip.querySelector('span:nth-child(2)').textContent = a.evento_nombre;
                     celdaAsig.appendChild(chip);
 
+                    if (!asigBody) continue;
                     const fila = document.createElement('tr');
                     fila.innerHTML = `
                         <td style="font-family:'Space Mono',monospace;font-size:0.66rem">${u.usuario}</td>
@@ -1078,9 +1306,11 @@
             }
             body.appendChild(tr);
         }
-        document.getElementById('tcAsignaciones').textContent = totalAsig;
-        document.getElementById('rAsignaciones').textContent = totalAsig;
-        if (!totalAsig) asigBody.innerHTML = '<tr><td colspan="4" class="empty">Sin asignaciones</td></tr>';
+        if (!ES_GENERAL) {
+            document.getElementById('tcAsignaciones').textContent = totalAsig;
+            document.getElementById('rAsignaciones').textContent = totalAsig;
+        }
+        if (asigBody && !totalAsig) asigBody.innerHTML = '<tr><td colspan="4" class="empty">Sin asignaciones</td></tr>';
     }
 
     document.getElementById('formUser').addEventListener('submit', async e => {
@@ -1091,7 +1321,8 @@
                 usuario: document.getElementById('uUsuario').value,
                 password: document.getElementById('uPassword').value,
                 admin: document.getElementById('uAdmin').checked,
-                nombre: document.getElementById('uNombre').value
+                nombre: document.getElementById('uNombre').value,
+                colegio_id: document.getElementById('uColegio') ? (+document.getElementById('uColegio').value || null) : null
             })
         });
         if (data.ok) {
@@ -1104,9 +1335,46 @@
         }
     });
 
+    async function cargarColegios() {
+        if (!ES_GENERAL) return;
+        try {
+            const data = await api('/api/colegios');
+            document.querySelectorAll('#evColegio, #uColegio, #asigColegio').forEach(sel => {
+                if (!sel) return;
+                const actual = sel.value;
+                sel.innerHTML = sel.id === 'uColegio'
+                    ? '<option value="">General — todos los colegios</option>'
+                    : '<option value="">Global — todos los colegios</option>';
+                (data.colegios || []).forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.nombre;
+                    sel.appendChild(opt);
+                });
+                sel.value = actual;
+            });
+            const body = document.getElementById('colegiosBody');
+            if (body) {
+                body.innerHTML = '';
+                (data.colegios || []).forEach(c => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td><strong>${c.nombre}</strong></td>
+                        <td>${c.eventos ?? 0}</td>
+                        <td>${c.usuarios ?? 0}</td>
+                        <td><div class="acciones"><button class="btn-mini rojo" data-borrar-colegio="${c.id}" data-nombre="${c.nombre}">Borrar</button></div></td>`;
+                    body.appendChild(tr);
+                });
+                const n = (data.colegios || []).length;
+                document.getElementById('tcColegios').textContent = n;
+                document.getElementById('countColegios').textContent = n;
+            }
+        } catch (e) { /* migración pendiente */ }
+    }
+
     async function cargarSelectores() {
-        const [users, eventos] = await Promise.all([api('/api/users'), api('/api/eventos')]);
         const selU = document.getElementById('asignarUser');
+        if (!selU) return; // admin general: sin formulario de staff
+        const [users, eventos] = await Promise.all([api('/api/users'), api('/api/eventos')]);
         const selE = document.getElementById('asignarEvento');
         selU.innerHTML = '<option value="">Elegir…</option>';
         selE.innerHTML = '<option value="">Elegir…</option>';
@@ -1133,12 +1401,46 @@
         else mostrarToast(data.error || 'Error', 'error');
     }
 
-    document.getElementById('asigBody').addEventListener('click', e => {
+    const asigBodyEl = document.getElementById('asigBody');
+    if (asigBodyEl) asigBodyEl.addEventListener('click', e => {
         const btn = e.target.closest('button[data-desasig]');
         if (btn) quitarAsignacion(btn.dataset.desasig, btn.dataset.ev);
     });
 
-    document.getElementById('formAsignar').addEventListener('submit', async e => {
+    const formColegio = document.getElementById('formColegio');
+    if (formColegio) formColegio.addEventListener('submit', async e => {
+        e.preventDefault();
+        const nombre = document.getElementById('colNombre').value.trim();
+        if (!nombre) return;
+        const data = await api('/api/colegios', {
+            method: 'POST',
+            body: JSON.stringify({ nombre })
+        });
+        if (data.ok) {
+            document.getElementById('colNombre').value = '';
+            mostrarToast('Colegio creado', 'ok');
+            cargarColegios(); cargarLogs();
+        } else {
+            mostrarToast(data.error || 'Error al crear colegio', 'error');
+        }
+    });
+
+    const colegiosBody = document.getElementById('colegiosBody');
+    if (colegiosBody) colegiosBody.addEventListener('click', async e => {
+        const btn = e.target.closest('[data-borrar-colegio]');
+        if (!btn) return;
+        if (!confirm(`¿Borrar el colegio "${btn.dataset.nombre}"?`)) return;
+        const data = await api(`/api/colegios/${btn.dataset.borrarColegio}`, { method: 'DELETE' });
+        if (data.ok) {
+            mostrarToast('Colegio borrado', 'ok');
+            cargarColegios(); cargarLogs();
+        } else {
+            mostrarToast(data.error || 'Error al borrar colegio', 'error');
+        }
+    });
+
+    const formAsignarEl = document.getElementById('formAsignar');
+    if (formAsignarEl) formAsignarEl.addEventListener('submit', async e => {
         e.preventDefault();
         const usuario_id = document.getElementById('asignarUser').value;
         const evento_id = document.getElementById('asignarEvento').value;
@@ -1155,6 +1457,108 @@
             mostrarToast(data.error || 'Error', 'error');
         }
     });
+
+    // ---------- Asignaciones del admin general: admins <-> colegios ----------
+    async function guardarAsignacionColegio(usuarioId, colegioId) {
+        const data = await api(`/api/users/${usuarioId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ colegio_id: colegioId })
+        });
+        if (data.ok) {
+            mostrarToast(colegioId ? 'Admin asignado al colegio' : 'Admin quitado del colegio', 'ok');
+            cargarUsers(); cargarColegios(); cargarLogs();
+        } else {
+            mostrarToast(data.error || 'Error', 'error');
+        }
+    }
+
+    const formAsigCo = document.getElementById('formAsignarColegio');
+    if (formAsigCo) formAsigCo.addEventListener('submit', e => {
+        e.preventDefault();
+        const usuarioId = document.getElementById('asigAdmin').value;
+        const colegioId = document.getElementById('asigColegio').value;
+        if (!usuarioId) { mostrarToast('Elegí un administrador', 'error'); return; }
+        if (!colegioId && !confirm('¿Dejar a este admin como GENERAL (sin colegio)?')) return;
+        guardarAsignacionColegio(parseInt(usuarioId), +colegioId || null);
+    });
+
+    const asigCoBody = document.getElementById('asigCoBody');
+    if (asigCoBody) asigCoBody.addEventListener('click', e => {
+        const btn = e.target.closest('[data-quitar-colegio]');
+        if (!btn) return;
+        guardarAsignacionColegio(parseInt(btn.dataset.quitarColegio), null);
+    });
+
+    // ---------- Finanzas (admin general) ----------
+    let finanzasCargadas = false;
+    async function cargarFinanzas() {
+        const data = await api('/api/dashboard');
+        const porColegio = data.por_colegio || [];
+        const porEvento = data.por_evento || [];
+        const nombres = {};
+        for (const c of porColegio) nombres[c.colegio_id ?? 'g'] = c.nombre;
+
+        // Gráfica: recaudado por colegio
+        const wrap = document.getElementById('chartColegios');
+        wrap.innerHTML = '';
+        if (!porColegio.length) {
+            wrap.innerHTML = '<p class="empty">Sin datos todavía</p>';
+        } else {
+            const max = Math.max(...porColegio.map(c => c.recaudado_total), 1);
+            for (const c of porColegio) {
+                const asis = c.total ? Math.round(c.usadas / c.total * 100) : 0;
+                const row = document.createElement('div');
+                row.className = 'bar-row';
+                row.innerHTML = `
+                    <div class="bar-head"><span class="bar-name"></span><span class="bar-val">₡${c.recaudado_total.toLocaleString('es-CR')}</span></div>
+                    <div class="bar-track">
+                        <div class="bar-total" style="width:${(c.recaudado_total / max * 100).toFixed(1)}%"></div>
+                        <div class="bar-fill" style="width:0%"></div>
+                    </div>
+                    <p class="bar-sub">${c.total} vendidas · ${asis}% asistió</p>`;
+                row.querySelector('.bar-name').textContent = `${c.nombre} · ${c.eventos} ev.`;
+                wrap.appendChild(row);
+            }
+        }
+
+        // Tabla: eventos agrupados por colegio
+        const body = document.getElementById('finanzasBody');
+        body.innerHTML = '';
+        if (!porEvento.length) {
+            body.innerHTML = '<tr><td colspan="6" class="empty">Sin eventos todavía</td></tr>';
+            return;
+        }
+        const grupos = new Map();
+        for (const ev of porEvento) {
+            const clave = ev.colegio_id ?? null;
+            if (!grupos.has(clave)) grupos.set(clave, []);
+            grupos.get(clave).push(ev);
+        }
+        const orden = [...grupos.keys()].sort((a, b) =>
+            (porColegio.find(c => (c.colegio_id ?? null) === b)?.recaudado_total || 0) -
+            (porColegio.find(c => (c.colegio_id ?? null) === a)?.recaudado_total || 0));
+        for (const cid of orden) {
+            const evs = grupos.get(cid);
+            const nombreCol = nombres[cid ?? 'g'] || (cid ? `Colegio #${cid}` : 'Global');
+            for (const [i, ev] of evs.entries()) {
+                const tr = document.createElement('tr');
+                // La celda del colegio solo va en la primera fila del grupo
+                // (rowspan cubre las siguientes); en las demás se omite.
+                let html = '';
+                if (i === 0) html += `<td rowspan="${evs.length}" style="font-weight:700"></td>`;
+                html += `
+                    <td></td>
+                    <td class="mono">₡${ev.precio_entrada.toLocaleString('es-CR')}</td>
+                    <td>${ev.total}</td>
+                    <td>${ev.usadas} (${ev.total ? Math.round(ev.usadas / ev.total * 100) : 0}%)</td>
+                    <td class="mono">₡${ev.recaudado_total.toLocaleString('es-CR')}</td>`;
+                tr.innerHTML = html;
+                if (i === 0) tr.cells[0].textContent = nombreCol;
+                tr.cells[i === 0 ? 1 : 0].textContent = ev.nombre;
+                body.appendChild(tr);
+            }
+        }
+    }
 
     let editandoId = null;
     const modalEdit = document.getElementById('modalEdit');
@@ -1251,9 +1655,11 @@
 
     // ---------- Init ----------
     async function init() {
-        await Promise.all([cargarEventos(), cargarUsers(), cargarLogs(), cargarSelectores()]);
+        await Promise.all([cargarEventos(), cargarUsers(), cargarLogs(), cargarSelectores(), cargarColegios()]);
         await cargarDashboard();
-        cambiarTab(location.hash.slice(1) || 'resumen');
+        const tabInicial = location.hash.slice(1) || 'resumen';
+        cambiarTab(tabInicial);
+        if (tabInicial === 'finanzas') { finanzasCargadas = true; cargarFinanzas(); }
     }
 
     init();

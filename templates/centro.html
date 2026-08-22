@@ -24,11 +24,11 @@
         </div>
         <div class="stat">
             <span class="stat-num stat-money stat-accent" id="statRecaudado">—</span>
-            <span class="stat-label">Recaudado total</span>
+            <span class="stat-label">Vendido total</span>
         </div>
         <div class="stat">
-            <span class="stat-num stat-money stat-ok" id="statRecaudadoUsadas">—</span>
-            <span class="stat-label">Recaudado usadas</span>
+            <span class="stat-num stat-ok" id="statAsistieron">—</span>
+            <span class="stat-label">Asistieron</span>
         </div>
     </div>
 
@@ -280,7 +280,7 @@
             const colones = n => '₡' + Number(n || 0).toLocaleString('es-CR');
             document.getElementById('statPrecio').textContent = colones(data.precio);
             document.getElementById('statRecaudado').textContent = colones(data.recaudado_total);
-            document.getElementById('statRecaudadoUsadas').textContent = colones(data.recaudado_usadas);
+            document.getElementById('statAsistieron').textContent = data.usadas + ' de ' + data.total;
         } catch (err) {
             mostrarToast('Error al cargar estadísticas');
         }

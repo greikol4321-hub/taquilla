@@ -67,6 +67,7 @@ TABLA_USERS = "users"
 TABLA_LOGS = "logs"
 TABLA_EVENTOS = "eventos"
 TABLA_ASIGNACIONES = "evento_usuarios"
+TABLA_COLEGIOS = "colegios"
 
 # Regex: cedula costa-ricense X-XXXX-XXXX (ej. 6-0510-0347)
 CEDULA_CR = re.compile(r'^\d{1,2}-\d{4}-\d{4}$')
@@ -195,6 +196,65 @@ def require_evento():
     return session.get("evento_id") is not None
 
 
+def es_admin_general():
+    """Admin sin colegio asignado: controla todos los colegios."""
+    return not session.get("colegio_id")
+
+
+def eventos_visibles(desc=False):
+    """Eventos alcanzables por el admin en sesión (su colegio o todos).
+
+    Si la migración de colegios aún no se ejecutó, devuelve todos.
+    """
+    def _consultar(filtrar):
+        q = supabase.table(TABLA_EVENTOS).select(
+            "id,nombre,precio_entrada,activo,colegio_id")
+        if filtrar:
+            q = q.eq("colegio_id", session["colegio_id"])
+        return q.order("id", desc=desc).execute()
+
+    if session.get("colegio_id"):
+        try:
+            return _consultar(True).data or []
+        except Exception:
+            pass  # columna colegio_id inexistente todavía
+    try:
+        return _consultar(False).data or []
+    except Exception:
+        return []
+
+
+def usuario_en_alcance(user_row):
+    """True si el usuario pertenece al alcance del admin en sesión.
+
+    Alcance del admin de colegio: usuarios de su colegio y staff
+    asignado a eventos de su colegio. El admin general alcanza a todos.
+    """
+    if not session.get("colegio_id"):
+        return True
+    if user_row.get("colegio_id") == session.get("colegio_id"):
+        return True
+    ev_ids = {e["id"] for e in eventos_visibles()}
+    if not ev_ids:
+        return False
+    asig = supabase.table(TABLA_ASIGNACIONES).select("evento_id") \
+        .eq("usuario_id", user_row["id"]).execute().data or []
+    return any(a["evento_id"] in ev_ids for a in asig)
+
+
+def _usuario_por_id(user_id):
+    """Fila de usuario con colegio_id si existe la columna."""
+    try:
+        r = supabase.table(TABLA_USERS).select(
+            "id,usuario,nombre,rol,colegio_id").eq("id", user_id).execute()
+    except Exception:
+        r = supabase.table(TABLA_USERS).select(
+            "id,usuario,nombre,rol").eq("id", user_id).execute()
+        for u in r.data or []:
+            u.setdefault("colegio_id", None)
+    return r.data[0] if r.data else None
+
+
 # -----------------------------------------------------------
 # Rutas de interfaz (protegidas con login)
 # -----------------------------------------------------------
@@ -247,7 +307,16 @@ def centro():
 @app.route("/admin")
 @require_rol("admin")
 def admin():
-    return render_template("admin.html", rol=session.get("rol"))
+    colegio_nombre = ""
+    if session.get("colegio_id"):
+        try:
+            colegio_nombre = supabase.table(TABLA_COLEGIOS).select("nombre") \
+                .eq("id", session["colegio_id"]).single().execute().data["nombre"]
+        except Exception:
+            pass
+    return render_template("admin.html", rol=session.get("rol"),
+                           es_general=not session.get("colegio_id"),
+                           colegio_nombre=colegio_nombre)
 
 
 # -----------------------------------------------------------
@@ -262,11 +331,19 @@ def api_login():
     usuario = data["usuario"].strip().lower()
     try:
         resp = supabase.table(TABLA_USERS).select(
-            "id,usuario,password_hash,rol,nombre"
+            "id,usuario,password_hash,rol,nombre,colegio_id"
         ).eq("usuario", usuario).execute()
     except Exception:
-        return jsonify({"ok": False,
-                        "error": "La tabla users no existe — ejecutá schema.sql en Supabase"}), 500
+        # La columna colegio_id puede no existir aún (migración pendiente)
+        try:
+            resp = supabase.table(TABLA_USERS).select(
+                "id,usuario,password_hash,rol,nombre"
+            ).eq("usuario", usuario).execute()
+            for u in resp.data:
+                u.setdefault("colegio_id", None)
+        except Exception:
+            return jsonify({"ok": False,
+                            "error": "La tabla users no existe — ejecutá schema.sql en Supabase"}), 500
 
     if not resp.data:
         return jsonify({"ok": False, "error": "Usuario o contraseña incorrectos"}), 401
@@ -279,6 +356,7 @@ def api_login():
     session["usuario"] = user["usuario"]
     session["nombre"] = user.get("nombre") or ""
     session["multi_evento"] = False
+    session["colegio_id"] = user.get("colegio_id")
 
     # Admin global: entra directo, no opera sobre eventos
     if user["rol"] == "admin":
@@ -287,9 +365,11 @@ def api_login():
         session["evento_nombre"] = None
         session["precio_entrada"] = 0
         destino = "admin"
-        registrar_log("login", f"{user.get('nombre', '')} ({user['usuario']}, admin)")
+        alcance = "general" if not user.get("colegio_id") else "colegio"
+        registrar_log("login", f"{user.get('nombre', '')} ({user['usuario']}, admin {alcance})")
         return jsonify({"ok": True, "rol": "admin", "destino": "/admin",
-                        "usuario": user["usuario"], "nombre": user.get("nombre", "")})
+                        "usuario": user["usuario"], "nombre": user.get("nombre", ""),
+                        "es_general": not user.get("colegio_id")})
 
     # Staff: buscar asignaciones en eventos activos
     asignaciones = asignaciones_usuario(user["id"])
@@ -334,13 +414,7 @@ def api_logout():
 @app.route("/api/eventos")
 @require_rol("admin")
 def api_eventos_listar():
-    try:
-        resp = supabase.table(TABLA_EVENTOS).select(
-            "id,nombre,precio_entrada,activo,creado_en"
-        ).order("id", desc=True).execute()
-        return jsonify({"eventos": resp.data})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+    return jsonify({"eventos": eventos_visibles(desc=True)})
 
 
 @app.route("/api/eventos", methods=["POST"])
@@ -359,10 +433,20 @@ def api_eventos_crear():
         return jsonify({"ok": False, "error": "El precio no puede ser negativo"}), 400
 
     try:
-        supabase.table(TABLA_EVENTOS).insert({
-            "nombre": nombre,
-            "precio_entrada": precio,
-        }).execute()
+        payload = {"nombre": nombre, "precio_entrada": precio}
+        # Admin de colegio crea para SU colegio; el general elige (o deja global)
+        colegio_id = session.get("colegio_id") or data.get("colegio_id")
+        if colegio_id:
+            payload["colegio_id"] = int(colegio_id)
+        try:
+            supabase.table(TABLA_EVENTOS).insert(payload).execute()
+        except Exception as e:
+            # Solo degradar si la columna realmente no existe (migración pendiente)
+            if "colegio_id" in payload and ("PGRST204" in str(e) or "Could not find the 'colegio_id' column" in str(e)):
+                payload.pop("colegio_id")
+                supabase.table(TABLA_EVENTOS).insert(payload).execute()
+            else:
+                raise
         registrar_log("evento_crear", f"{nombre} | precio {precio}")
         return jsonify({"ok": True, "nombre": nombre, "precio": precio})
     except Exception:
@@ -725,72 +809,135 @@ def api_exportar():
 @app.route("/api/dashboard")
 @require_rol("admin")
 def api_dashboard():
-    """Estadisticas generales y por evento (incluye desglose por vendedor)."""
-    try:
-        eventos = supabase.table(TABLA_EVENTOS).select(
-            "id,nombre,precio_entrada,activo").order("id").execute().data
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+    """Estadisticas generales, por evento y por colegio (admin general).
+
+    Una sola query de entradas (in_ sobre eventos visibles) en vez de
+    2-3 queries por evento.
+    """
+    eventos = eventos_visibles()
+    ev_ids = [e["id"] for e in eventos]
 
     general = {"eventos": len(eventos), "total": 0, "usadas": 0,
                "recaudado_total": 0, "recaudado_usadas": 0}
     por_evento = []
+    es_general = es_admin_general()
+
+    # Agregados por evento y vendedor: una sola lectura de entradas
+    agg = {e["id"]: {"total": 0, "usadas": 0, "por_vendedor": {}} for e in eventos}
+    if ev_ids:
+        try:
+            rows = supabase.table(TABLA).select("evento_id,usado,vendedor") \
+                .in_("evento_id", ev_ids).execute().data or []
+            for r in rows:
+                a = agg.get(r["evento_id"])
+                if not a:
+                    continue
+                a["total"] += 1
+                if r.get("usado"):
+                    a["usadas"] += 1
+                v = r.get("vendedor") or "—"
+                pv = a["por_vendedor"].setdefault(v, {"total": 0, "usadas": 0})
+                pv["total"] += 1
+                if r.get("usado"):
+                    pv["usadas"] += 1
+        except Exception as e:
+            print(f"[dashboard] error leyendo entradas: {e}")
 
     for ev in eventos:
         eid = ev["id"]
         precio = ev["precio_entrada"]
-        total = supabase.table(TABLA).select("id", count="exact") \
-            .eq("evento_id", eid).execute().count
-        usadas = supabase.table(TABLA).select("id", count="exact") \
-            .eq("evento_id", eid).eq("usado", True).execute().count
-
-        por_vendedor = {}
-        try:
-            rows = supabase.table(TABLA).select("vendedor,usado") \
-                .eq("evento_id", eid).execute().data
-            for r in rows:
-                v = r.get("vendedor") or "—"
-                por_vendedor.setdefault(v, {"total": 0, "usadas": 0})
-                por_vendedor[v]["total"] += 1
-                if r["usado"]:
-                    por_vendedor[v]["usadas"] += 1
-        except Exception:
-            pass
+        total = agg[eid]["total"]
+        usadas = agg[eid]["usadas"]
 
         por_evento.append({
             "id": eid, "nombre": ev["nombre"], "precio_entrada": precio,
             "activo": ev["activo"],
+            "colegio_id": ev.get("colegio_id"),
             "total": total, "usadas": usadas, "pendientes": total - usadas,
             "recaudado_total": total * precio,
             "recaudado_usadas": usadas * precio,
-            "por_vendedor": por_vendedor,
+            "por_vendedor": agg[eid]["por_vendedor"],
         })
         general["total"] += total
         general["usadas"] += usadas
         general["recaudado_total"] += total * precio
         general["recaudado_usadas"] += usadas * precio
 
-    return jsonify({"general": general, "por_evento": por_evento})
+    respuesta = {"general": general, "por_evento": por_evento}
+
+    # Desglose por colegio (solo admin general)
+    if es_general:
+        nombres = {}
+        try:
+            cols = supabase.table(TABLA_COLEGIOS).select(
+                "id,nombre").execute().data or []
+            nombres = {c["id"]: c["nombre"] for c in cols}
+        except Exception:
+            pass
+
+        por_colegio = {}
+        for ev, datos in zip(eventos, por_evento):
+            cid = ev.get("colegio_id")
+            clave = cid if cid else None
+            g = por_colegio.setdefault(clave, {
+                "colegio_id": cid,
+                "nombre": nombres.get(cid) if cid else "Global",
+                "eventos": 0, "total": 0, "usadas": 0,
+                "recaudado_total": 0, "recaudado_usadas": 0})
+            g["eventos"] += 1
+            g["total"] += datos["total"]
+            g["usadas"] += datos["usadas"]
+            g["recaudado_total"] += datos["recaudado_total"]
+            g["recaudado_usadas"] += datos["recaudado_usadas"]
+
+        lista = sorted(por_colegio.values(),
+                       key=lambda x: -x["recaudado_total"])
+        respuesta["por_colegio"] = lista
+
+    return jsonify(respuesta)
 
 
 @app.route("/api/logs")
 @require_rol("admin")
 def api_logs():
+    def _consultar(filtrar):
+        q = supabase.table(TABLA_LOGS).select(
+            "id,accion,detalle,usuario,creado_en,evento_id")
+        if filtrar:
+            ev_ids = [e["id"] for e in eventos_visibles()]
+            if not ev_ids:
+                return None
+            q = q.in_("evento_id", ev_ids)
+        return q.order("id", desc=True).limit(300).execute()
+
     try:
-        resp = supabase.table(TABLA_LOGS).select(
-            "id,accion,detalle,usuario,creado_en,evento_id"
-        ).order("id", desc=True).limit(300).execute()
-        return jsonify({"logs": resp.data})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        resp = _consultar(bool(session.get("colegio_id")))
+        if resp is None:
+            return jsonify({"logs": []})
+        return jsonify({"ok": True, "logs": resp.data})
+    except Exception:
+        # Sin filtro si la migración de colegios no corrió todavía
+        try:
+            resp = supabase.table(TABLA_LOGS).select(
+                "id,accion,detalle,usuario,creado_en,evento_id"
+            ).order("id", desc=True).limit(300).execute()
+            return jsonify({"ok": True, "logs": resp.data})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/users")
 @require_rol("admin")
 def api_users_listar():
     try:
-        users = supabase.table(TABLA_USERS).select(
-            "id,usuario,rol,nombre,creado_en").order("id").execute().data
+        try:
+            users = supabase.table(TABLA_USERS).select(
+                "id,usuario,rol,nombre,colegio_id,creado_en").order("id").execute().data
+        except Exception:
+            users = supabase.table(TABLA_USERS).select(
+                "id,usuario,rol,nombre,creado_en").order("id").execute().data
+            for u in users:
+                u.setdefault("colegio_id", None)
         asig = supabase.table(TABLA_ASIGNACIONES).select(
             "usuario_id,evento_id,rol,eventos(nombre)").execute().data
         eventos_nombre = {a["evento_id"]: (a.get("eventos") or {}).get("nombre", "")
@@ -804,6 +951,17 @@ def api_users_listar():
             })
         for u in users:
             u["asignaciones"] = por_usuario.get(u["id"], [])
+
+        # Admin de colegio: solo ve usuarios de su colegio y su staff
+        if session.get("colegio_id"):
+            ev_ids = {e["id"] for e in eventos_visibles()}
+            en_alcance = {u["id"] for u in users
+                          if u.get("colegio_id") == session["colegio_id"]}
+            for a in asig:
+                if a["evento_id"] in ev_ids:
+                    en_alcance.add(a["usuario_id"])
+            users = [u for u in users if u["id"] in en_alcance]
+
         return jsonify({"users": users})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -826,14 +984,33 @@ def api_users_crear():
     if existe.data:
         return jsonify({"ok": False, "error": "Ese usuario ya existe"}), 409
 
-    supabase.table(TABLA_USERS).insert({
-        "usuario": usuario,
-        "password_hash": generate_password_hash(password),
-        "rol": "admin" if admin else None,
-        "nombre": nombre,
-    }).execute()
-    registrar_log("user_crear", f"{nombre} ({usuario}, {'admin' if admin else 'staff'})")
-    return jsonify({"ok": True})
+    try:
+        payload = {
+            "usuario": usuario,
+            "password_hash": generate_password_hash(password),
+            "rol": "admin" if admin else None,
+            "nombre": nombre,
+        }
+        # Admin de colegio crea dentro de su colegio; el general elige destino
+        colegio_id = session.get("colegio_id") or data.get("colegio_id")
+        if colegio_id:
+            payload["colegio_id"] = int(colegio_id)
+        try:
+            supabase.table(TABLA_USERS).insert(payload).execute()
+        except Exception as e:
+            # Solo degradar si la columna realmente no existe (migración pendiente);
+            # NUNCA ante errores de FK u otros, que crearían admins generales por accidente
+            if "colegio_id" in payload and ("PGRST204" in str(e) or "Could not find the 'colegio_id' column" in str(e)):
+                payload.pop("colegio_id")
+                supabase.table(TABLA_USERS).insert(payload).execute()
+            else:
+                raise
+        registrar_log("user_crear", f"{nombre} ({usuario}, {'admin' if admin else 'staff'})")
+        return jsonify({"ok": True})
+    except Exception as e:
+        if "duplicate key" in str(e) or "already exists" in str(e):
+            return jsonify({"ok": False, "error": "Ese usuario ya existe"}), 409
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/users/<int:user_id>", methods=["PUT"])
@@ -861,12 +1038,18 @@ def api_users_editar(user_id):
     if data.get("password"):
         cambios["password_hash"] = generate_password_hash(data["password"])
 
+    # Solo el admin general puede mover usuarios entre colegios
+    if "colegio_id" in data and es_admin_general():
+        cambios["colegio_id"] = int(data["colegio_id"]) if data["colegio_id"] else None
+
     if not cambios:
         return jsonify({"ok": False, "error": "Nada que editar"}), 400
 
-    prev = supabase.table(TABLA_USERS).select("usuario,nombre,rol").eq("id", user_id).execute()
-    if not prev.data:
+    prev_row = _usuario_por_id(user_id)
+    if not prev_row:
         return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
+    if not usuario_en_alcance(prev_row):
+        return jsonify({"ok": False, "error": "Ese usuario está fuera de tu colegio"}), 403
 
     resp = supabase.table(TABLA_USERS).update(cambios).eq("id", user_id).execute()
     if not resp.data:
@@ -895,16 +1078,17 @@ def api_users_editar(user_id):
 @app.route("/api/users/<int:user_id>", methods=["DELETE"])
 @require_rol("admin")
 def api_users_borrar(user_id):
-    prev = supabase.table(TABLA_USERS).select("usuario,nombre,rol").eq("id", user_id).execute()
-    if not prev.data:
+    prev_row = _usuario_por_id(user_id)
+    if not prev_row:
         return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
 
-    if prev.data[0]["usuario"] == session.get("usuario"):
+    if prev_row["usuario"] == session.get("usuario"):
         return jsonify({"ok": False, "error": "No podés borrar tu propio usuario"}), 400
+    if not usuario_en_alcance(prev_row):
+        return jsonify({"ok": False, "error": "Ese usuario está fuera de tu colegio"}), 403
 
     supabase.table(TABLA_USERS).delete().eq("id", user_id).execute()
-    u = prev.data[0]
-    registrar_log("user_borrar", f"{u.get('nombre', '')} ({u['usuario']})")
+    registrar_log("user_borrar", f"{prev_row.get('nombre', '')} ({prev_row['usuario']})")
     return jsonify({"ok": True})
 
 
@@ -927,6 +1111,11 @@ def api_asignar():
     if not ev.data:
         return jsonify({"ok": False, "error": "Evento no encontrado"}), 404
 
+    # Admin de colegio solo asigna sobre eventos de su colegio
+    if session.get("colegio_id") and \
+            int(evento_id) not in {e["id"] for e in eventos_visibles()}:
+        return jsonify({"ok": False, "error": "Ese evento está fuera de tu colegio"}), 403
+
     supabase.table(TABLA_ASIGNACIONES).upsert(
         {"usuario_id": usuario_id, "evento_id": evento_id, "rol": rol},
         on_conflict="evento_id,usuario_id").execute()
@@ -947,6 +1136,82 @@ def api_desasignar():
         .eq("usuario_id", usuario_id).eq("evento_id", evento_id).execute()
     registrar_log("user_desasignar", f"usuario {usuario_id} quitado de evento {evento_id}")
     return jsonify({"ok": True})
+
+
+@app.route("/api/colegios")
+@require_rol("admin")
+def api_colegios_listar():
+    try:
+        rows = supabase.table(TABLA_COLEGIOS).select(
+            "id,nombre").order("nombre").execute()
+        # Conteos por colegio (tablas pequeñas, un query por tabla)
+        evs = supabase.table(TABLA_EVENTOS).select("colegio_id").execute()
+        uss = supabase.table(TABLA_USERS).select("colegio_id").execute()
+        n_ev, n_us = {}, {}
+        for r in evs.data or []:
+            n_ev[r.get("colegio_id")] = n_ev.get(r.get("colegio_id"), 0) + 1
+        for r in uss.data or []:
+            n_us[r.get("colegio_id")] = n_us.get(r.get("colegio_id"), 0) + 1
+        colegios = [{**c,
+                     "eventos": n_ev.get(c["id"], 0),
+                     "usuarios": n_us.get(c["id"], 0)} for c in rows.data]
+        return jsonify({"ok": True, "colegios": colegios})
+    except Exception:
+        # Migración de colegios pendiente: lista vacía, la app sigue normal
+        return jsonify({"ok": True, "colegios": []})
+
+
+@app.route("/api/colegios", methods=["POST"])
+@require_rol("admin")
+def api_colegios_crear():
+    if not es_admin_general():
+        return jsonify({"ok": False,
+                        "error": "Solo el admin general puede crear colegios"}), 403
+
+    data = request.get_json(silent=True) or {}
+    nombre = (data.get("nombre") or "").strip()[:80]
+    if not nombre:
+        return jsonify({"ok": False, "error": "Nombre del colegio requerido"}), 400
+
+    existe = supabase.table(TABLA_COLEGIOS).select("id") \
+        .eq("nombre", nombre).execute()
+    if existe.data:
+        return jsonify({"ok": False, "error": "Ese colegio ya existe"}), 409
+
+    try:
+        resp = supabase.table(TABLA_COLEGIOS).insert(
+            {"nombre": nombre}).execute()
+        registrar_log("colegio_crear", nombre)
+        return jsonify({"ok": True, "id": resp.data[0]["id"], "nombre": nombre})
+    except Exception as e:
+        if "does not exist" in str(e) or "schema cache" in str(e):
+            return jsonify({"ok": False,
+                            "error": "Ejecutá migrar_colegios.sql en Supabase primero"}), 400
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/colegios/<int:colegio_id>", methods=["DELETE"])
+@require_rol("admin")
+def api_colegios_borrar(colegio_id):
+    if not es_admin_general():
+        return jsonify({"ok": False,
+                        "error": "Solo el admin general puede borrar colegios"}), 403
+
+    try:
+        evs = supabase.table(TABLA_EVENTOS).select("id", count="exact") \
+            .eq("colegio_id", colegio_id).execute()
+        uss = supabase.table(TABLA_USERS).select("id", count="exact") \
+            .eq("colegio_id", colegio_id).execute()
+        en_uso = (evs.count or 0) + (uss.count or 0)
+        if en_uso:
+            return jsonify({"ok": False,
+                            "error": f"No se puede borrar: {en_uso} elemento(s) asignados a este colegio. Reasignalos primero."}), 409
+
+        supabase.table(TABLA_COLEGIOS).delete().eq("id", colegio_id).execute()
+        registrar_log("colegio_borrar", f"colegio {colegio_id}")
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 # -----------------------------------------------------------
