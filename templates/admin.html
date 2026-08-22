@@ -715,11 +715,11 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             Finanzas
         </button>
-        {% endif %}
             <button type="button" class="nav-item" data-tab="logs" role="tab" aria-selected="false">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                 Logs <span class="mini-count" id="tcLogs">0</span>
             </button>
+        {% endif %}
 
             {% if not es_general %}
             <p class="alcance-badge"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18"/><path d="M10 7h4"/><path d="M10 11h4"/><path d="M10 15h4"/></svg> {{ colegio_nombre or "Mi colegio" }}</p>
@@ -955,6 +955,7 @@
         </section>
         {% endif %}
 
+        {% if es_general %}
         <!-- ============ LOGS ============ -->
         <section class="card" data-panel="logs" hidden>
             <div class="card-in">
@@ -970,6 +971,7 @@
                 </div>
             </div>
         </section>
+        {% endif %}
 
         {% if es_general %}
         <!-- ============ COLEGIOS ============ -->
@@ -1007,8 +1009,25 @@
             <div class="card-in">
                 <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Finanzas por colegio y evento</h2>
 
-                <p class="chart-titulo">Dinero generado por colegio (entradas vendidas)</p>
-                <div id="chartColegios"></div>
+                <div class="stats-grid">
+                    <div class="stat-card"><span class="label">Recaudado total</span><span class="valor mono" id="finTotal">₡0</span><span class="detalle" id="finColegios">0 colegios</span></div>
+                    <div class="stat-card"><span class="label">Colegio líder</span><span class="valor" id="finLider" style="font-size:0.92rem">—</span><span class="detalle mono" id="finLiderMonto">₡0</span></div>
+                    <div class="stat-card"><span class="label">Ticket promedio</span><span class="valor mono" id="finTicket">₡0</span><span class="detalle" id="finVendidas">0 vendidas</span></div>
+                    <div class="stat-card"><span class="label">Tasa de uso</span><span class="valor" id="finTasa">0%</span><span class="detalle" id="finTasaDet">0/0 usadas</span></div>
+                </div>
+
+                <div class="bento">
+                    <div>
+                        <p class="chart-titulo">Dinero por colegio</p>
+                        <div style="position:relative; min-height: 160px;"><canvas id="chartFinanzas" height="160"></canvas></div>
+                    </div>
+                    <div>
+                        <p class="chart-titulo">Distribución</p>
+                        <div style="position:relative; height: 180px; display:flex; align-items:center; justify-content:center;"><canvas id="chartDistribucion" height="180"></canvas></div>
+                        <div class="leyenda" id="leyendaFinanzas" style="margin-top:10px;"></div>
+                    </div>
+                </div>
+                <div id="chartColegios" style="display:none;"></div>
 
                 <p class="chart-titulo">Detalle: eventos de cada colegio</p>
                 <div class="tabla-wrap">
@@ -1752,6 +1771,7 @@
 
     // ---------- Finanzas (admin general) ----------
     let finanzasCargadas = false;
+    let chartFinanzasInst = null, chartDistInst = null;
     async function cargarFinanzas() {
         const data = await api('/api/dashboard');
         const porColegio = data.por_colegio || [];
@@ -1759,28 +1779,96 @@
         const nombres = {};
         for (const c of porColegio) nombres[c.colegio_id ?? 'g'] = c.nombre;
 
-        // Gráfica: recaudado por colegio
-        const wrap = document.getElementById('chartColegios');
-        wrap.innerHTML = '';
-        if (!porColegio.length) {
-            wrap.innerHTML = '<p class="empty">Sin datos todavía</p>';
-        } else {
-            const max = Math.max(...porColegio.map(c => c.recaudado_total), 1);
-            for (const c of porColegio) {
-                const asis = c.total ? Math.round(c.usadas / c.total * 100) : 0;
-                const row = document.createElement('div');
-                row.className = 'bar-row';
-                row.innerHTML = `
-                    <div class="bar-head"><span class="bar-name"></span><span class="bar-val">₡${c.recaudado_total.toLocaleString('es-CR')}</span></div>
-                    <div class="bar-track">
-                        <div class="bar-total" style="width:${(c.recaudado_total / max * 100).toFixed(1)}%"></div>
-                        <div class="bar-fill" style="width:0%"></div>
-                    </div>
-                    <p class="bar-sub">${c.total} vendidas · ${asis}% asistió</p>`;
-                row.querySelector('.bar-name').textContent = `${c.nombre} · ${c.eventos} ev.`;
-                wrap.appendChild(row);
+        // Stats
+        const totalRec = porColegio.reduce((a,c) => a + c.recaudado_total, 0);
+        const totalVend = porColegio.reduce((a,c) => a + c.total, 0);
+        const totalUsadas = porColegio.reduce((a,c) => a + c.usadas, 0);
+        const lider = porColegio[0];
+        const el = id => document.getElementById(id);
+        if (el('finTotal')) el('finTotal').textContent = '₡' + totalRec.toLocaleString('es-CR');
+        if (el('finColegios')) el('finColegios').textContent = porColegio.length + ' colegio' + (porColegio.length!==1?'s':'') + ' · ' + porEvento.length + ' evento' + (porEvento.length!==1?'s':'');
+        if (el('finLider')) el('finLider').textContent = lider ? lider.nombre : '—';
+        if (el('finLiderMonto')) el('finLiderMonto').textContent = lider ? '₡' + lider.recaudado_total.toLocaleString('es-CR') : '₡0';
+        if (el('finTicket')) el('finTicket').textContent = '₡' + (totalVend ? Math.round(totalRec / totalVend) : 0).toLocaleString('es-CR');
+        if (el('finVendidas')) el('finVendidas').textContent = totalVend + ' vendidas';
+        if (el('finTasa')) el('finTasa').textContent = (totalVend ? Math.round(totalUsadas/totalVend*100) : 0) + '%';
+        if (el('finTasaDet')) el('finTasaDet').textContent = totalUsadas + '/' + totalVend + ' usadas';
+
+        // Charts — Chart.js (gratis, CDN) con retry si aún no cargó
+        if (typeof Chart === 'undefined') {
+            setTimeout(cargarFinanzas, 300);
+            return;
+        }
+        const cf = document.getElementById('chartFinanzas');
+        const cd = document.getElementById('chartDistribucion');
+        if (cf) {
+            if (chartFinanzasInst) chartFinanzasInst.destroy();
+            const labels = porColegio.map(c => c.nombre);
+            const vals = porColegio.map(c => c.recaudado_total);
+            const bg = porColegio.map(c => c.color || '#8a8f98');
+            cf.height = Math.max(90, labels.length * 38 + 24);
+            chartFinanzasInst = new Chart(cf.getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [{ data: vals, backgroundColor: bg, borderRadius: 999, barThickness: 14, maxBarThickness: 16 }] },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    animation: { duration: 600, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(18,18,26,0.96)', titleColor: '#ecebe6', bodyColor: '#8b8a94',
+                            borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, padding: 10, displayColors: false,
+                            callbacks: { label: ctx => ' ₡' + ctx.raw.toLocaleString('es-CR') + ` · ${porColegio[ctx.dataIndex].total} vendidas` }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.06)', drawBorder: false }, border: { display: false }, ticks: { color: '#8b8a94', font: { family: 'Space Mono', size: 10 }, callback: v => '₡' + Number(v).toLocaleString('es-CR') } },
+                        y: { grid: { display: false }, border: { display: false }, ticks: { color: '#ecebe6', font: { family: 'Karla', size: 11, weight: '600' } } }
+                    }
+                }
+            });
+        }
+        if (cd) {
+            if (chartDistInst) chartDistInst.destroy();
+            const hasData = porColegio.some(c => c.total > 0);
+            if (!hasData) {
+                const ctx = cd.getContext('2d'); ctx.clearRect(0,0,cd.width, cd.height);
+                ctx.fillStyle = '#8b8a94'; ctx.font = "12px 'Space Mono'"; ctx.textAlign = 'center';
+                ctx.fillText('Sin ventas aún', cd.width/2, cd.height/2);
+            } else {
+                const labels = porColegio.map(c => c.nombre);
+                const vals = porColegio.map(c => c.total);
+                const bg = porColegio.map(c => c.color || '#8a8f98');
+                chartDistInst = new Chart(cd.getContext('2d'), {
+                    type: 'doughnut',
+                    data: { labels, datasets: [{ data: vals, backgroundColor: bg, borderWidth: 0, hoverOffset: 6 }] },
+                    options: {
+                        cutout: '62%', responsive: true, maintainAspectRatio: false,
+                        animation: { duration: 700, easing: 'easeOutQuart' },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(18,18,26,0.96)', titleColor: '#ecebe6', bodyColor: '#8b8a94',
+                                borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, padding: 10, displayColors: true,
+                                callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} vendidas (${totalVend ? Math.round(ctx.raw/totalVend*100) : 0}%)` }
+                            }
+                        }
+                    }
+                });
+                const ley = document.getElementById('leyendaFinanzas');
+                if (ley) {
+                    ley.innerHTML = '';
+                    porColegio.forEach((c,i) => {
+                        const row = document.createElement('div'); row.className='fila';
+                        row.innerHTML = `<span class="punto" style="background:${bg[i]}"></span><span class="nombre">${esc(c.nombre)}</span><span class="dato">${c.total} · ${totalVend?Math.round(c.total/totalVend*100):0}%</span>`;
+                        ley.appendChild(row);
+                    });
+                }
             }
         }
+        // Fallback oculto para compat
+        const wrap = document.getElementById('chartColegios');
+        if (wrap) wrap.innerHTML = '';
 
         // Tabla: eventos agrupados por colegio
         const body = document.getElementById('finanzasBody');
