@@ -305,9 +305,8 @@
         return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
-    // Escapa datos de usuario antes de interpolarlos en innerHTML (XSS)
-    const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    // Escapa datos de usuario antes de interpolarlos en innerHTML (XSS) — function para hoisting
+    function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
     function renderTabla() {
         const filtro = document.getElementById('busqueda').value.trim().toUpperCase();

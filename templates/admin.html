@@ -311,6 +311,46 @@
         transition: width 0.7s var(--cubic);
     }
 
+    /* Selector de gráfica (segmentado) */
+    .seg {
+        display: inline-flex;
+        gap: 4px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 999px;
+        padding: 3px;
+        margin-bottom: 14px;
+    }
+    .seg button {
+        border: none;
+        background: transparent;
+        color: var(--texto-suave);
+        font-family: 'Karla', sans-serif;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 5px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.2s var(--cubic);
+    }
+    .seg button.activo { background: var(--lima); color: #101408; }
+    .seg button:not(.activo):hover { color: var(--texto); }
+
+    /* Swatch de color editable en tabla colegios */
+    .swatch {
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        border: 2px solid rgba(255,255,255,0.15);
+        border-radius: 8px;
+        background: transparent;
+        cursor: pointer;
+    }
+    .swatch::-webkit-color-swatch-wrapper { padding: 0; }
+    .swatch::-webkit-color-swatch { border: none; border-radius: 5px; }
+
     /* Recaudado */
     .prog-nums { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 
@@ -684,8 +724,18 @@
                     </div>
 
                     <div>
+                        {% if es_general %}
+                        <p class="chart-titulo">Comparativa</p>
+                        <div class="seg" id="segGrafica">
+                            <button data-modo="evento" class="activo">Por evento</button>
+                            <button data-modo="colegio">Por colegio</button>
+                            <button data-modo="dinero">Vendido ₡</button>
+                        </div>
+                        <div id="chartEventos"></div>
+                        {% else %}
                         <p class="chart-titulo">Entradas por evento</p>
                         <div id="chartEventos"></div>
+                        {% endif %}
                     </div>
 
                     <div>
@@ -841,6 +891,7 @@
             <div class="card-in">
                 <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg> Eventos <span class="count" id="countEventos">0</span></h2>
 
+                {% if not es_general %}
                 <form class="form-seccion" id="formEvento">
                     <div class="form-grid c2">
                         <div class="field">
@@ -851,15 +902,10 @@
                             <label for="ePrecio">Precio por entrada (₡)</label>
                             <input type="number" id="ePrecio" placeholder="Ej: 1000" min="0" step="1" autocomplete="off">
                         </div>
-                        {% if es_general %}
-                        <div class="field">
-                            <label for="evColegio">Colegio del evento (vacío = global)</label>
-                            <select id="evColegio"><option value="">Global — todos los colegios</option></select>
-                        </div>
-                        {% endif %}
                     </div>
                     <button class="btn-primario" type="submit">Crear evento</button>
                 </form>
+                {% endif %}
 
                 <div class="tabla-wrap">
                     <table>
@@ -899,6 +945,10 @@
                         <div class="field">
                             <label for="colNombre">Nombre del colegio</label>
                             <input type="text" id="colNombre" placeholder="Ej: Colegio CTPM" autocomplete="off" maxlength="80">
+                        </div>
+                        <div class="field">
+                            <label for="colColor">Color para gráficas</label>
+                            <input type="color" id="colColor" value="#d9ff3d">
                         </div>
                     </div>
                     <button class="btn-primario" type="submit">Crear colegio</button>
@@ -1050,9 +1100,26 @@
         document.getElementById('barRec').style.width = pctR + '%';
         document.getElementById('recPct').textContent = pctR + '% de asistencia';
 
-        pintarChartEventos(data.por_evento || []);
-        pintarPorColegio(data.por_colegio || []);
-        return data.por_evento || [];
+        // Guardar para el selector
+        window._porEvento = data.por_evento || [];
+        window._porColegio = data.por_colegio || [];
+
+        // Render inicial
+        pintarComparativa(window._porEvento, window._porColegio, modoGrafica);
+        pintarPorColegio(window._porColegio);
+
+        // Selector de gráfica (solo admin general)
+        const seg = document.getElementById('segGrafica');
+        if (seg) {
+            seg.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    seg.querySelectorAll('button').forEach(b => b.classList.remove('activo'));
+                    btn.classList.add('activo');
+                    pintarComparativa(window._porEvento, window._porColegio, btn.dataset.modo);
+                });
+            });
+        }
+        return window._porEvento;
     }
 
     function pintarPorColegio(porColegio) {
@@ -1065,36 +1132,85 @@
         }
         for (const c of porColegio) {
             const tr = document.createElement('tr');
+            const color = c.color || '#8a8f98';
             tr.innerHTML = `
-                <td><strong></strong></td>
+                <td><span class="punto" style="background:${color}"></span><strong>${esc(c.nombre)}</strong></td>
                 <td>${c.eventos}</td>
                 <td>${c.total}</td>
                 <td>${c.usadas}</td>
                 <td>${c.total - c.usadas}</td>
                 <td class="mono">₡${c.recaudado_total.toLocaleString('es-CR')}</td>`;
-            tr.querySelector('strong').textContent = c.nombre;
             body.appendChild(tr);
         }
     }
 
-    function pintarChartEventos(porEvento) {
+    // Gráfica con selector: Por evento / Por colegio / Vendido ₡
+    let modoGrafica = 'evento';
+    function pintarComparativa(porEvento, porColegio, modo) {
+        modoGrafica = modo || modoGrafica;
         const wrap = document.getElementById('chartEventos');
         wrap.innerHTML = '';
-        if (!porEvento.length) {
-            wrap.innerHTML = '<p class="empty">Sin eventos todavía</p>';
+
+        // Mapa de colores por colegio_id (null = 'g' = global)
+        const colores = { g: '#d9ff3d' };
+        for (const c of porColegio || []) {
+            colores[c.colegio_id ?? 'g'] = c.color || '#8a8f98';
+        }
+
+        let items = [];
+        let getLabel, getValue, getSub, maxVal = 1;
+
+        if (modoGrafica === 'evento') {
+            items = porEvento || [];
+            maxVal = Math.max(...items.map(e => e.total), 1);
+            getLabel = e => e.nombre;
+            getValue = e => `${e.usadas}/${e.total}`;
+            getSub = e => `${e.total ? Math.round(e.usadas / e.total * 100) : 0}% asistencia`;
+            // color por evento: usa colegio_color del evento
+            for (const e of items) {
+                e._barColor = e.colegio_color || colores.g;
+            }
+        } else if (modoGrafica === 'colegio') {
+            items = porColegio || [];
+            maxVal = Math.max(...items.map(c => c.total), 1);
+            getLabel = c => c.nombre;
+            getValue = c => c.total;
+            getSub = c => `${c.total ? Math.round(c.usadas / c.total * 100) : 0}% asistencia · ${c.eventos} ev.`;
+            for (const c of items) c._barColor = c.color || '#8a8f98';
+        } else { // 'dinero'
+            items = [...(porColegio || [])].sort((a, b) => b.recaudado_total - a.recaudado_total);
+            maxVal = Math.max(...items.map(c => c.recaudado_total), 1);
+            getLabel = c => c.nombre;
+            getValue = c => '₡' + c.recaudado_total.toLocaleString('es-CR');
+            getSub = c => `${c.total} vendidas · ${c.total ? Math.round(c.usadas / c.total * 100) : 0}% asistencia`;
+            for (const c of items) c._barColor = c.color || '#8a8f98';
+        }
+
+        if (!items.length) {
+            wrap.innerHTML = '<p class="empty">Sin datos</p>';
             return;
         }
-        const max = Math.max(...porEvento.map(e => e.total), 1);
-        for (const ev of porEvento) {
+
+        for (const it of items) {
             const row = document.createElement('div');
             row.className = 'bar-row';
+            const colorBar = it._barColor;
+            let barras;
+            if (modoGrafica === 'evento') {
+                const pctTotal = it.total / maxVal * 100;
+                const pctUsadas = (it.usadas || 0) / maxVal * 100;
+                barras = `<div class="bar-total" style="width:${pctTotal.toFixed(1)}%;background:${colorBar}33"></div>`
+                       + `<div class="bar-fill" style="width:${pctUsadas.toFixed(1)}%;background:${colorBar}"></div>`;
+            } else {
+                const v = it.total ?? it.recaudado_total ?? 0;
+                const pct = v / maxVal * 100;
+                barras = `<div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${colorBar}"></div>`;
+            }
             row.innerHTML = `
-                <div class="bar-head"><span class="bar-name"></span><span class="bar-val">${ev.usadas}/${ev.total}</span></div>
-                <div class="bar-track">
-                    <div class="bar-total" style="width:${(ev.total / max * 100).toFixed(1)}%"></div>
-                    <div class="bar-fill" style="width:${(ev.usadas / max * 100).toFixed(1)}%"></div>
-                </div>`;
-            row.querySelector('.bar-name').textContent = ev.nombre;
+                <div class="bar-head"><span class="bar-name"></span><span class="bar-val">${esc(getValue(it))}</span></div>
+                <div class="bar-track">${barras}</div>
+                <p class="bar-sub">${esc(getSub(it))}</p>`;
+            row.querySelector('.bar-name').textContent = getLabel(it);
             wrap.appendChild(row);
         }
     }
@@ -1154,7 +1270,8 @@
 
     const modalEvento = document.getElementById('modalEvento');
 
-    document.getElementById('formEvento').addEventListener('submit', async e => {
+    const formEvento = document.getElementById('formEvento');
+    if (formEvento) formEvento.addEventListener('submit', async e => {
         e.preventDefault();
         const nombre = document.getElementById('evNombre').value.trim();
         const precio = parseInt(document.getElementById('ePrecio').value) || 1000;
@@ -1358,11 +1475,36 @@
                 body.innerHTML = '';
                 (data.colegios || []).forEach(c => {
                     const tr = document.createElement('tr');
-                    tr.innerHTML = `<td><strong>${esc(c.nombre)}</strong></td>
+                    const color = c.color || '#8a8f98';
+                    tr.innerHTML = `<td><span class="punto" style="background:${color}"></span><strong>${esc(c.nombre)}</strong></td>
                         <td>${c.eventos ?? 0}</td>
                         <td>${c.usuarios ?? 0}</td>
-                        <td><div class="acciones"><button class="btn-mini rojo" data-borrar-colegio="${c.id}" data-nombre="${esc(c.nombre)}">Borrar</button></div></td>`;
+                        <td>
+                            <input type="color" class="swatch" value="${color}" data-color-colegio="${c.id}" aria-label="Color del colegio">
+                            <div class="acciones"><button class="btn-mini rojo" data-borrar-colegio="${c.id}" data-nombre="${esc(c.nombre)}">Borrar</button></div>
+                        </td>`;
                     body.appendChild(tr);
+                });
+                // Cambio de color inline
+                body.querySelectorAll('input.swatch[data-color-colegio]').forEach(inp => {
+                    inp.addEventListener('change', async () => {
+                        const id = inp.dataset.colorColegio;
+                        const color = inp.value;
+                        const r = await api('/api/colegios/' + id, {
+                            method: 'PUT',
+                            body: JSON.stringify({ color })
+                        });
+                        if (!r.ok) {
+                            inp.value = inp.defaultValue;
+                            mostrarToast('No se pudo cambiar el color', 'error');
+                        } else {
+                            inp.defaultValue = color;
+                            // Actualizar punto de la fila
+                            const tr = inp.closest('tr');
+                            if (tr) tr.querySelector('.punto').style.background = color;
+                            mostrarToast('Color actualizado', 'ok');
+                        }
+                    });
                 });
                 const n = (data.colegios || []).length;
                 document.getElementById('tcColegios').textContent = n;
@@ -1411,10 +1553,11 @@
     if (formColegio) formColegio.addEventListener('submit', async e => {
         e.preventDefault();
         const nombre = document.getElementById('colNombre').value.trim();
+        const color = document.getElementById('colColor').value;
         if (!nombre) return;
         const data = await api('/api/colegios', {
             method: 'POST',
-            body: JSON.stringify({ nombre })
+            body: JSON.stringify({ nombre, color })
         });
         if (data.ok) {
             document.getElementById('colNombre').value = '';
@@ -1619,9 +1762,8 @@
         return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
 
-    // Escapa datos de usuario antes de interpolarlos en innerHTML (XSS)
-    const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    // Escapa datos de usuario antes de interpolarlos en innerHTML (XSS) — function para hoisting
+    function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
     async function cargarLogs() {
         const data = await api('/api/logs');

@@ -451,6 +451,11 @@ def api_eventos_listar():
 @app.route("/api/eventos", methods=["POST"])
 @require_rol("admin")
 def api_eventos_crear():
+    # La creación de eventos es del admin de colegio; el general solo supervisa
+    if es_admin_general():
+        return jsonify({"ok": False,
+                        "error": "Los eventos los crean los admins de cada colegio"}), 403
+
     data = request.get_json(silent=True) or {}
     nombre = (data.get("nombre") or "").strip()[:100]
     try:
@@ -898,11 +903,16 @@ def api_dashboard():
 
     # Desglose por colegio (solo admin general)
     if es_general:
-        nombres = {}
+        nombres, colores = {}, {}
         try:
-            cols = supabase.table(TABLA_COLEGIOS).select(
-                "id,nombre").execute().data or []
+            try:
+                cols = supabase.table(TABLA_COLEGIOS).select(
+                    "id,nombre,color").execute().data or []
+            except Exception:
+                cols = supabase.table(TABLA_COLEGIOS).select(
+                    "id,nombre").execute().data or []
             nombres = {c["id"]: c["nombre"] for c in cols}
+            colores = {c["id"]: c.get("color") for c in cols}
         except Exception:
             pass
 
@@ -913,6 +923,7 @@ def api_dashboard():
             g = por_colegio.setdefault(clave, {
                 "colegio_id": cid,
                 "nombre": nombres.get(cid) if cid else "Global",
+                "color": colores.get(cid),
                 "eventos": 0, "total": 0, "usadas": 0,
                 "recaudado_total": 0, "recaudado_usadas": 0})
             g["eventos"] += 1
@@ -923,6 +934,10 @@ def api_dashboard():
 
         lista = sorted(por_colegio.values(),
                        key=lambda x: -x["recaudado_total"])
+        # Color de colegio también en el detalle por evento (para gráficas)
+        for ev in respuesta["por_evento"]:
+            cid = ev.get("colegio_id")
+            ev["colegio_color"] = colores.get(cid) if cid else None
         respuesta["por_colegio"] = lista
 
     return jsonify(respuesta)
@@ -1135,8 +1150,10 @@ def api_asignar():
     if not usuario_id or not evento_id or rol not in ("vendedor", "portero"):
         return jsonify({"ok": False, "error": "usuario_id, evento_id y rol (vendedor/portero) requeridos"}), 400
 
-    user = supabase.table(TABLA_USERS).select("usuario").eq("id", usuario_id).execute()
-    ev = supabase.table(TABLA_EVENTOS).select("nombre").eq("id", evento_id).execute()
+    user = supabase.table(TABLA_USERS).select("usuario,colegio_id") \
+        .eq("id", usuario_id).execute()
+    ev = supabase.table(TABLA_EVENTOS).select("nombre,colegio_id") \
+        .eq("id", evento_id).execute()
     if not user.data:
         return jsonify({"ok": False, "error": "Usuario no encontrado"}), 404
     if not ev.data:
@@ -1146,6 +1163,14 @@ def api_asignar():
     if session.get("colegio_id") and \
             int(evento_id) not in {e["id"] for e in eventos_visibles()}:
         return jsonify({"ok": False, "error": "Ese evento está fuera de tu colegio"}), 403
+
+    # Integridad: staff y evento deben ser del mismo colegio
+    # (los eventos globales aceptan staff de cualquier colegio)
+    u_col = user.data[0].get("colegio_id")
+    e_col = ev.data[0].get("colegio_id")
+    if u_col and e_col and u_col != e_col:
+        return jsonify({"ok": False,
+                        "error": "Ese usuario pertenece a otro colegio que el evento"}), 403
 
     supabase.table(TABLA_ASIGNACIONES).upsert(
         {"usuario_id": usuario_id, "evento_id": evento_id, "rol": rol},
@@ -1163,6 +1188,11 @@ def api_desasignar():
     if not usuario_id or not evento_id:
         return jsonify({"ok": False, "error": "usuario_id y evento_id requeridos"}), 400
 
+    # Admin de colegio solo desasigna de eventos de su colegio
+    if session.get("colegio_id") and \
+            int(evento_id) not in {e["id"] for e in eventos_visibles()}:
+        return jsonify({"ok": False, "error": "Ese evento está fuera de tu colegio"}), 403
+
     supabase.table(TABLA_ASIGNACIONES).delete() \
         .eq("usuario_id", usuario_id).eq("evento_id", evento_id).execute()
     registrar_log("user_desasignar", f"usuario {usuario_id} quitado de evento {evento_id}")
@@ -1173,8 +1203,15 @@ def api_desasignar():
 @require_rol("admin")
 def api_colegios_listar():
     try:
-        rows = supabase.table(TABLA_COLEGIOS).select(
-            "id,nombre").order("nombre").execute()
+        try:
+            rows = supabase.table(TABLA_COLEGIOS).select(
+                "id,nombre,color").order("nombre").execute()
+        except Exception:
+            # Columna color aún no migrada
+            rows = supabase.table(TABLA_COLEGIOS).select(
+                "id,nombre").order("nombre").execute()
+            for c in rows.data:
+                c["color"] = None
         # Conteos por colegio (tablas pequeñas, un query por tabla)
         evs = supabase.table(TABLA_EVENTOS).select("colegio_id").execute()
         uss = supabase.table(TABLA_USERS).select("colegio_id").execute()
@@ -1209,15 +1246,59 @@ def api_colegios_crear():
     if existe.data:
         return jsonify({"ok": False, "error": "Ese colegio ya existe"}), 409
 
+    color = (data.get("color") or "").strip().lower()
+    if not re.fullmatch(r"#[0-9a-f]{6}", color):
+        # Color automático: siguiente de la paleta según cantidad de colegios
+        existentes = supabase.table(TABLA_COLEGIOS).select("id").execute()
+        PALETA = ["#d9ff3d", "#4dd4ac", "#5aa9ff", "#ff7ab6",
+                  "#ffb84d", "#b78bff", "#ff6b6b", "#4dd4ff"]
+        color = PALETA[(existentes.count or len(existentes.data or [])) % len(PALETA)]
+
     try:
         resp = supabase.table(TABLA_COLEGIOS).insert(
-            {"nombre": nombre}).execute()
+            {"nombre": nombre, "color": color}).execute()
         registrar_log("colegio_crear", nombre)
-        return jsonify({"ok": True, "id": resp.data[0]["id"], "nombre": nombre})
+        return jsonify({"ok": True, "id": resp.data[0]["id"], "nombre": nombre,
+                        "color": color})
     except Exception as e:
+        if "color" in str(e) and ("column" in str(e) or "schema cache" in str(e)):
+            # Migración de color pendiente: crear sin color
+            try:
+                resp = supabase.table(TABLA_COLEGIOS).insert(
+                    {"nombre": nombre}).execute()
+                registrar_log("colegio_crear", nombre)
+                return jsonify({"ok": True, "id": resp.data[0]["id"],
+                                "nombre": nombre, "color": None})
+            except Exception as e2:
+                return jsonify({"ok": False, "error": str(e2)}), 500
         if "does not exist" in str(e) or "schema cache" in str(e):
             return jsonify({"ok": False,
                             "error": "Ejecutá migrar_colegios.sql en Supabase primero"}), 400
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/colegios/<int:colegio_id>", methods=["PUT"])
+@require_rol("admin")
+def api_colegios_color(colegio_id):
+    """Cambiar el color del colegio (para las gráficas)."""
+    if not es_admin_general():
+        return jsonify({"ok": False,
+                        "error": "Solo el admin general puede editar colegios"}), 403
+
+    data = request.get_json(silent=True) or {}
+    color = (data.get("color") or "").strip().lower()
+    if not re.fullmatch(r"#[0-9a-f]{6}", color):
+        return jsonify({"ok": False, "error": "Color inválido (#rrggbb)"}), 400
+
+    try:
+        supabase.table(TABLA_COLEGIOS).update(
+            {"color": color}).eq("id", colegio_id).execute()
+        registrar_log("colegio_editar", f"colegio {colegio_id} → color {color}")
+        return jsonify({"ok": True, "color": color})
+    except Exception as e:
+        if "color" in str(e) and ("column" in str(e) or "schema cache" in str(e)):
+            return jsonify({"ok": False,
+                            "error": "Ejecutá 20260823000000_color_y_integridad.sql en Supabase primero"}), 400
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
