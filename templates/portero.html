@@ -319,7 +319,7 @@
 </style>
 {% endblock %}
 {% block scripts %}
-<script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js'"></script>
 <script>
     let html5QrCode = null;
     let scannerActivo = false;
@@ -460,6 +460,9 @@
                     }
                 })();
             } else {
+                if (typeof Html5Qrcode === 'undefined') {
+                    throw new Error('Html5Qrcode no cargó — revisá tu conexión o usá modo manual');
+                }
                 modoHtml5 = true;
                 if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
                 const onScan = (codigoDecodificado) => {
