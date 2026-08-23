@@ -1005,7 +1005,7 @@
                             <input type="color" id="colColor" value="#d9ff3d">
                         </div>
                     </div>
-                    <button class="btn-primario" type="submit">Crear colegio</button>
+                    <button class="btn-primario" type="submit">Crear lugar</button>
                 </form>
 
                 <div class="tabla-wrap">
@@ -1120,8 +1120,8 @@
         'evento_editar': 'Editar evento',
         'evento_borrar': 'Borrar evento',
         'evento_seleccionar': 'Seleccionar evento',
-        'colegio_crear': 'Crear colegio',
-        'colegio_borrar': 'Borrar colegio'
+        'colegio_crear': 'Crear lugar',
+        'colegio_borrar': 'Borrar lugar'
     };
 
     const C_DONUT = 2 * Math.PI * 50;
@@ -1734,7 +1734,7 @@
             mostrarToast('Lugar creado', 'ok');
             cargarColegios(); cargarLogs();
         } else {
-            mostrarToast(data.error || 'Error al crear colegio', 'error');
+            mostrarToast(data.error || 'Error al crear lugar', 'error');
         }
     });
 
