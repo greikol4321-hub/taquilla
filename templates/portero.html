@@ -417,7 +417,20 @@
             document.getElementById('camaraOpciones').style.display = 'none';
             document.getElementById('cameraError').classList.remove('show');
 
-            streamVideo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            // ponytail: probar environment, luego user, luego genérico — laptop no tiene trasera
+            try {
+                streamVideo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } } });
+            } catch (e) {
+                try {
+                    streamVideo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                } catch (e2) {
+                    try {
+                        streamVideo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                    } catch (e3) {
+                        streamVideo = await navigator.mediaDevices.getUserMedia({ video: true });
+                    }
+                }
+            }
             document.getElementById('btnDetenerCamara').style.display = 'block';
 
             if ('BarcodeDetector' in window) {
@@ -449,18 +462,18 @@
             } else {
                 modoHtml5 = true;
                 if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-                await html5QrCode.start(
-                    { facingMode: "environment" },
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
-                    (codigoDecodificado) => {
-                        if (scannerActivo) {
-                            scannerActivo = false;
-                            detenerCamara();
-                            validarCodigo(codigoDecodificado.trim(), 'camara');
-                        }
-                    },
-                    () => {}
-                );
+                const onScan = (codigoDecodificado) => {
+                    if (scannerActivo) {
+                        scannerActivo = false;
+                        detenerCamara();
+                        validarCodigo(codigoDecodificado.trim(), 'camara');
+                    }
+                };
+                try {
+                    await html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScan, () => {});
+                } catch (e) {
+                    await html5QrCode.start({ facingMode: "user" }, { fps: 10, qrbox: { width: 250, height: 250 } }, onScan, () => {});
+                }
                 scannerActivo = true;
             }
         } catch (err) {
