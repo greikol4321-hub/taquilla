@@ -524,7 +524,7 @@ def api_eventos_crear():
     # La creación de eventos es del admin de colegio; el general solo supervisa
     if es_admin_general():
         return jsonify({"ok": False,
-                        "error": "Los eventos los crean los admins de cada colegio"}), 403
+                        "error": "Los eventos los crean los admins de cada lugar"}), 403
 
     data = request.get_json(silent=True) or {}
     nombre = (data.get("nombre") or "").strip()[:100]
@@ -959,7 +959,7 @@ def api_exportar():
 
 @app.route("/api/exportar/excel")
 def api_exportar_excel():
-    """Excel estilizado Taquilla — con colores por colegio, orden y resumen."""
+    """Excel estilizado Taquilla — con colores por lugar, orden y resumen."""
     if not session.get("auth"):
         return jsonify({"ok": False, "error": "No autorizado"}), 401
 
@@ -990,7 +990,7 @@ def api_exportar_excel():
         eventos = eventos_visibles(desc=False)
         filtro_colegio = None
 
-    # Datos de colegios para colores
+    # Datos de lugares para colores
     try:
         cols = supabase.table(TABLA_COLEGIOS).select("id,nombre,color").execute().data or []
     except Exception:
@@ -1022,7 +1022,7 @@ def api_exportar_excel():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-    # Ordenar por colegio > evento > usado > nombre (para que se vea ordenado)
+    # Ordenar por lugar > evento > usado > nombre (para que se vea ordenado)
     def sort_key(r):
         ev = mapa_evento.get(r["evento_id"], {})
         col_id = ev.get("colegio_id")
@@ -1080,7 +1080,7 @@ def api_exportar_excel():
     # Subtítulo con fecha y alcance
     ws.merge_cells("A2:I2")
     c = ws["A2"]
-    alcance_txt = "Todos los colegios" if (rol=="admin" and not session.get("colegio_id") and not filtro_colegio) else (mapa_colegio.get(filtro_colegio, {}).get("nombre") if filtro_colegio else (mapa_colegio.get(session.get("colegio_id"), {}).get("nombre") or "Mi colegio" if rol=="admin" and session.get("colegio_id") else session.get("evento_nombre") or "Reporte"))
+    alcance_txt = "Todos los lugares" if (rol=="admin" and not session.get("colegio_id") and not filtro_colegio) else (mapa_colegio.get(filtro_colegio, {}).get("nombre") if filtro_colegio else (mapa_colegio.get(session.get("colegio_id"), {}).get("nombre") or "Mi lugar" if rol=="admin" and session.get("colegio_id") else session.get("evento_nombre") or "Reporte"))
     c.value = f"{alcance_txt}  •  {time.strftime('%d/%m/%Y %H:%M')}  •  {total} entradas  •  {usadas} usadas  •  {pendientes} pendientes  •  ₡{recaudado:,}".replace(",", ".")
     c.font = sub_font
     c.fill = PatternFill(start_color="1A1A22", end_color="1A1A22", fill_type="solid")
@@ -1107,7 +1107,7 @@ def api_exportar_excel():
     ws.row_dimensions[3].height = 16
 
     # Cabecera de tabla (fila 5)
-    headers = ["#", "Código", "Nombre", "Cédula", "Evento", "Colegio", "Precio", "Estado", "Vendedor / Fecha"]
+    headers = ["#", "Código", "Nombre", "Cédula", "Evento", "Lugar", "Precio", "Estado", "Vendedor / Fecha"]
     col_widths = [5, 12, 22, 14, 20, 18, 9, 10, 22]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
@@ -1130,7 +1130,7 @@ def api_exportar_excel():
         colegio_color = (col_info["color"] if col_info and col_info.get("color") else ("#8A8F98" if colegio_nombre!="Global" else "#D9FF3D")).lstrip("#")
         estado = "Usada" if r.get("usado") else "Pendiente"
         precio = precio_de(r)
-        # Color sutil por colegio en la primera columna
+        # Color sutil por lugar en la primera columna
         is_alt = idx % 2 == 0
         fill = alt_fill if is_alt else even_fill
 
@@ -1230,7 +1230,7 @@ def api_exportar_excel():
 @app.route("/api/dashboard")
 @require_rol("admin")
 def api_dashboard():
-    """Estadisticas generales, por evento y por colegio (admin general).
+    """Estadisticas generales, por evento y por lugar (admin general).
 
     Una sola query de entradas (in_ sobre eventos visibles) en vez de
     2-3 queries por evento. Cacheada 15s por alcance.
@@ -1294,7 +1294,7 @@ def api_dashboard():
 
     respuesta = {"general": general, "por_evento": por_evento}
 
-    # Desglose por colegio (solo admin general)
+    # Desglose por lugar (solo admin general)
     if es_general:
         nombres, colores = {}, {}
         try:
@@ -1628,7 +1628,7 @@ def api_colegios_listar():
 def api_colegios_crear():
     if not es_admin_general():
         return jsonify({"ok": False,
-                        "error": "Solo el admin general puede crear colegios"}), 403
+                        "error": "Solo el admin general puede crear lugares"}), 403
 
     data = request.get_json(silent=True) or {}
     nombre = (data.get("nombre") or "").strip()[:80]
@@ -1638,7 +1638,7 @@ def api_colegios_crear():
     existe = supabase.table(TABLA_COLEGIOS).select("id") \
         .eq("nombre", nombre).execute()
     if existe.data:
-        return jsonify({"ok": False, "error": "Ese colegio ya existe"}), 409
+        return jsonify({"ok": False, "error": "Ese lugar ya existe"}), 409
 
     color = (data.get("color") or "").strip().lower()
     if not re.fullmatch(r"#[0-9a-f]{6}", color):
@@ -1677,7 +1677,7 @@ def api_colegios_color(colegio_id):
     """Cambiar el color del colegio (para las gráficas)."""
     if not es_admin_general():
         return jsonify({"ok": False,
-                        "error": "Solo el admin general puede editar colegios"}), 403
+                        "error": "Solo el admin general puede editar lugares"}), 403
 
     data = request.get_json(silent=True) or {}
     color = (data.get("color") or "").strip().lower()
@@ -1701,7 +1701,7 @@ def api_colegios_color(colegio_id):
 def api_colegios_borrar(colegio_id):
     if not es_admin_general():
         return jsonify({"ok": False,
-                        "error": "Solo el admin general puede borrar colegios"}), 403
+                        "error": "Solo el admin general puede borrar lugares"}), 403
 
     try:
         evs = supabase.table(TABLA_EVENTOS).select("id", count="exact") \
@@ -1711,7 +1711,7 @@ def api_colegios_borrar(colegio_id):
         en_uso = (evs.count or 0) + (uss.count or 0)
         if en_uso:
             return jsonify({"ok": False,
-                            "error": f"No se puede borrar: {en_uso} elemento(s) asignados a este colegio. Reasignalos primero."}), 409
+                            "error": f"No se puede borrar: {en_uso} elemento(s) asignados a este lugar. Reasignalos primero."}), 409
 
         supabase.table(TABLA_COLEGIOS).delete().eq("id", colegio_id).execute()
         registrar_log("colegio_borrar", f"colegio {colegio_id}")

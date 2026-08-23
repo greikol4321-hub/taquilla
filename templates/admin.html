@@ -709,7 +709,7 @@
         {% if es_general %}
         <button type="button" class="nav-item" data-tab="colegios" role="tab" aria-selected="false">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18"/><path d="M10 7h4"/><path d="M10 11h4"/><path d="M10 15h4"/></svg>
-            Colegios <span class="mini-count" id="tcColegios">0</span>
+            Lugares <span class="mini-count" id="tcColegios">0</span>
         </button>
         <button type="button" class="nav-item" data-tab="finanzas" role="tab" aria-selected="false">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -791,11 +791,11 @@
 
                 {% if es_general %}
                 <div class="por-colegio">
-                    <p class="chart-titulo">Desglose por colegio</p>
+                    <p class="chart-titulo">Desglose por lugar</p>
                     <div class="tabla-wrap">
                         <table>
                             <thead>
-                                <tr><th>Colegio</th><th>Eventos</th><th>Entradas</th><th>Asistieron</th><th>Pendientes</th><th>Vendido</th></tr>
+                                <tr><th>Lugar</th><th>Eventos</th><th>Entradas</th><th>Asistieron</th><th>Pendientes</th><th>Vendido</th></tr>
                             </thead>
                             <tbody id="colegioResumenBody"></tbody>
                         </table>
@@ -850,8 +850,8 @@
                         </div>
                         {% if es_general %}
                         <div class="field">
-                            <label for="uColegio">Colegio del admin (vacío = general)</label>
-                            <select id="uColegio"><option value="">General — todos los colegios</option></select>
+                            <label for="uColegio">Lugar del admin (vacío = general)</label>
+                            <select id="uColegio"><option value="">General — todos los lugares</option></select>
                         </div>
                         {% endif %}
                         <div class="field">
@@ -889,8 +889,8 @@
                             <select id="asigAdmin"><option value="">Elegir…</option></select>
                         </div>
                         <div class="field">
-                            <label for="asigColegio">Colegio</label>
-                            <select id="asigColegio"><option value="">Sin colegio (general)</option></select>
+                            <label for="asigColegio">Lugar</label>
+                            <select id="asigColegio"><option value="">Sin lugar (general)</option></select>
                         </div>
                     </div>
                     <button class="btn-primario" type="submit">Guardar asignación</button>
@@ -899,7 +899,7 @@
                 <div class="tabla-wrap">
                     <table>
                         <thead>
-                            <tr><th>Administrador</th><th>Colegio</th><th></th></tr>
+                            <tr><th>Administrador</th><th>Lugar</th><th></th></tr>
                         </thead>
                         <tbody id="asigCoBody"></tbody>
                     </table>
@@ -992,13 +992,13 @@
         <!-- ============ COLEGIOS ============ -->
         <section class="card" data-panel="colegios" hidden>
             <div class="card-in">
-                <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18"/><path d="M10 7h4"/><path d="M10 11h4"/><path d="M10 15h4"/></svg> Colegios <span class="count" id="countColegios">0</span></h2>
+                <h2><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M6 22V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v18"/><path d="M10 7h4"/><path d="M10 11h4"/><path d="M10 15h4"/></svg> Lugares <span class="count" id="countColegios">0</span></h2>
 
                 <form class="form-seccion" id="formColegio">
                     <div class="form-grid c2">
                         <div class="field">
-                            <label for="colNombre">Nombre del colegio</label>
-                            <input type="text" id="colNombre" placeholder="Ej: Colegio CTPM" autocomplete="off" maxlength="80">
+                            <label for="colNombre">Nombre del lugar</label>
+                            <input type="text" id="colNombre" placeholder="Ej: Lugar Central" autocomplete="off" maxlength="80">
                         </div>
                         <div class="field">
                             <label for="colColor">Color para gráficas</label>
@@ -1011,7 +1011,7 @@
                 <div class="tabla-wrap">
                     <table>
                         <thead>
-                            <tr><th>Colegio</th><th>Eventos</th><th>Usuarios</th><th>Acciones</th></tr>
+                            <tr><th>Lugar</th><th>Eventos</th><th>Usuarios</th><th>Acciones</th></tr>
                         </thead>
                         <tbody id="colegiosBody"></tbody>
                     </table>
@@ -1027,7 +1027,7 @@
                 <div style="display:flex; gap:10px; align-items:end; margin-bottom: 18px; flex-wrap:wrap;">
                     <div class="field" style="flex:1; min-width: 200px; margin:0;">
                         <label for="excelColegio">Exportar Excel</label>
-                        <select id="excelColegio"><option value="">Todos los colegios</option></select>
+                        <select id="excelColegio"><option value="">Todos los lugares</option></select>
                     </div>
                     <button class="btn-primario" id="btnExcel" style="width:auto; padding: 12px 20px; font-size:0.78rem; white-space:nowrap; display:flex; align-items:center; gap:8px;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -1036,8 +1036,8 @@
                 </div>
 
                 <div class="stats-grid">
-                    <div class="stat-card"><span class="label">Recaudado total</span><span class="valor mono" id="finTotal">₡0</span><span class="detalle" id="finColegios">0 colegios</span></div>
-                    <div class="stat-card"><span class="label">Colegio líder</span><span class="valor" id="finLider" style="font-size:0.92rem">—</span><span class="detalle mono" id="finLiderMonto">₡0</span></div>
+                    <div class="stat-card"><span class="label">Recaudado total</span><span class="valor mono" id="finTotal">₡0</span><span class="detalle" id="finColegios">0 lugares</span></div>
+                    <div class="stat-card"><span class="label">Lugar líder</span><span class="valor" id="finLider" style="font-size:0.92rem">—</span><span class="detalle mono" id="finLiderMonto">₡0</span></div>
                     <div class="stat-card"><span class="label">Ticket promedio</span><span class="valor mono" id="finTicket">₡0</span><span class="detalle" id="finVendidas">0 vendidas</span></div>
                     <div class="stat-card"><span class="label">Tasa de uso</span><span class="valor" id="finTasa">0%</span><span class="detalle" id="finTasaDet">0/0 usadas</span></div>
                 </div>
@@ -1055,11 +1055,11 @@
                 </div>
                 <div id="chartColegios" style="display:none;"></div>
 
-                <p class="chart-titulo">Detalle: eventos de cada colegio</p>
+                <p class="chart-titulo">Detalle: eventos de cada lugar</p>
                 <div class="tabla-wrap">
                     <table>
                         <thead>
-                            <tr><th>Colegio</th><th>Evento</th><th>Precio</th><th>Vendidas</th><th>Asistieron</th><th>Dinero generado</th></tr>
+                            <tr><th>Lugar</th><th>Evento</th><th>Precio</th><th>Vendidas</th><th>Asistieron</th><th>Dinero generado</th></tr>
                         </thead>
                         <tbody id="finanzasBody"></tbody>
                     </table>
@@ -1532,7 +1532,7 @@
                         ${a.colegio_id ? `<button class="btn-mini rojo" data-quitar-colegio="${a.id}">Quitar del colegio</button>` : '<span class="detalle">—</span>'}
                     </div></td>`;
                 tr.querySelector('td.detalle').textContent =
-                    a.colegio_id ? `Colegio #${a.colegio_id}` : 'Sin colegio (admin general)';
+                    a.colegio_id ? `Lugar #${a.colegio_id}` : 'Sin lugar (admin general)';
                 coBody.appendChild(tr);
                 if (a.colegio_id) totalAdmCo++;
             }
@@ -1544,7 +1544,7 @@
                 const mapa = Object.fromEntries((colsData.colegios || []).map(c => [c.id, c.nombre]));
                 [...coBody.querySelectorAll('tr')].forEach(tr => {
                     const td = tr.querySelector('td.detalle');
-                    const m = td.textContent.match(/Colegio #(\d+)/);
+                    const m = td.textContent.match(/Lugar #(\d+)/);
                     if (m && mapa[m[1]]) td.textContent = mapa[m[1]];
                 });
             } catch (e2) { /* migración pendiente */ }
@@ -1630,8 +1630,8 @@
                 if (!sel) return;
                 const actual = sel.value;
                 sel.innerHTML = sel.id === 'uColegio'
-                    ? '<option value="">General — todos los colegios</option>'
-                    : '<option value="">Global — todos los colegios</option>';
+                    ? '<option value="">General — todos los lugares</option>'
+                    : '<option value="">Global — todos los lugares</option>';
                 (data.colegios || []).forEach(c => {
                     const opt = document.createElement('option');
                     opt.value = c.id;
@@ -1731,7 +1731,7 @@
         });
         if (data.ok) {
             document.getElementById('colNombre').value = '';
-            mostrarToast('Colegio creado', 'ok');
+            mostrarToast('Lugar creado', 'ok');
             cargarColegios(); cargarLogs();
         } else {
             mostrarToast(data.error || 'Error al crear colegio', 'error');
@@ -1745,7 +1745,7 @@
         if (!confirm(`¿Borrar el colegio "${btn.dataset.nombre}"?`)) return;
         const data = await api(`/api/colegios/${btn.dataset.borrarColegio}`, { method: 'DELETE' });
         if (data.ok) {
-            mostrarToast('Colegio borrado', 'ok');
+            mostrarToast('Lugar borrado', 'ok');
             cargarColegios(); cargarLogs();
         } else {
             mostrarToast(data.error || 'Error al borrar colegio', 'error');
@@ -1819,7 +1819,7 @@
         const lider = porColegio[0];
         const el = id => document.getElementById(id);
         if (el('finTotal')) el('finTotal').textContent = '₡' + totalRec.toLocaleString('es-CR');
-        if (el('finColegios')) el('finColegios').textContent = porColegio.length + ' colegio' + (porColegio.length!==1?'s':'') + ' · ' + porEvento.length + ' evento' + (porEvento.length!==1?'s':'');
+        if (el('finColegios')) el('finColegios').textContent = porColegio.length + ' lugar' + (porColegio.length!==1?'es':'') + ' · ' + porEvento.length + ' evento' + (porEvento.length!==1?'s':'');
         if (el('finLider')) el('finLider').textContent = lider ? lider.nombre : '—';
         if (el('finLiderMonto')) el('finLiderMonto').textContent = lider ? '₡' + lider.recaudado_total.toLocaleString('es-CR') : '₡0';
         if (el('finTicket')) el('finTicket').textContent = '₡' + (totalVend ? Math.round(totalRec / totalVend) : 0).toLocaleString('es-CR');
@@ -1921,7 +1921,7 @@
             (porColegio.find(c => (c.colegio_id ?? null) === a)?.recaudado_total || 0));
         for (const cid of orden) {
             const evs = grupos.get(cid);
-            const nombreCol = nombres[cid ?? 'g'] || (cid ? `Colegio #${cid}` : 'Global');
+            const nombreCol = nombres[cid ?? 'g'] || (cid ? `Lugar #${cid}` : 'Global');
             for (const [i, ev] of evs.entries()) {
                 const tr = document.createElement('tr');
                 // La celda del colegio solo va en la primera fila del grupo
@@ -2046,7 +2046,7 @@
             try {
                 const d = await api('/api/colegios');
                 const cur = selColegio.value;
-                selColegio.innerHTML = '<option value="">Todos los colegios</option>';
+                selColegio.innerHTML = '<option value="">Todos los lugares</option>';
                 (d.colegios || []).forEach(c => {
                     const o = document.createElement('option'); o.value = c.id; o.textContent = c.nombre;
                     selColegio.appendChild(o);
