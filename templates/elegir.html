@@ -99,8 +99,8 @@
             if (res.status === 401) { location.href = '/login'; return; }
             const data = await res.json();
             const cont = document.getElementById('listaEventos');
-            if (!data.ok) { mostrarToast(data.error || 'Error', 'error'); return; }
-            if (!data.eventos.length) {
+            if (data.ok === false) { mostrarToast(data.error || 'Error', 'error'); return; }
+            if (!data.eventos || !data.eventos.length) {
                 cont.innerHTML = '<div class="elegir-loading">No tenés eventos asignados</div>';
                 return;
             }
