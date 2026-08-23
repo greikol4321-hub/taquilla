@@ -268,33 +268,54 @@
 {% block scripts %}
 <script>
     let entradas = [];
+    // ponytail: sessionStorage stale-while-revalidate — pinta cache instantáneo, luego refresca
+    const _CACHE_TTL = 8000;
+    function _getCache(k){
+        try{
+            const raw = sessionStorage.getItem(k);
+            if(!raw) return null;
+            const {t,v}=JSON.parse(raw);
+            if(Date.now()-t > _CACHE_TTL) return v; // stale igual sirve para pintar rápido
+            return v;
+        }catch{ return null; }
+    }
+    function _setCache(k,v){ try{ sessionStorage.setItem(k, JSON.stringify({t:Date.now(),v})); }catch{} }
+    function _pintaStats(data){
+        document.getElementById('statTotal').textContent = data.total;
+        document.getElementById('statUsadas').textContent = data.usadas;
+        document.getElementById('statPendientes').textContent = data.pendientes;
+        const colones = n => '₡' + Number(n || 0).toLocaleString('es-CR');
+        document.getElementById('statPrecio').textContent = colones(data.precio);
+        document.getElementById('statRecaudado').textContent = colones(data.recaudado_total);
+        document.getElementById('statAsistieron').textContent = data.usadas + ' de ' + data.total;
+    }
 
     async function cargarStats() {
+        const cached = _getCache('taquilla_stats');
+        if(cached) _pintaStats(cached);
         try {
-            const res = await fetch('/api/stats');
+            const res = await fetch('/api/stats', {cache:'default'});
             if (res.status === 401) { location.href = '/login'; return; }
             const data = await res.json();
-            document.getElementById('statTotal').textContent = data.total;
-            document.getElementById('statUsadas').textContent = data.usadas;
-            document.getElementById('statPendientes').textContent = data.pendientes;
-            const colones = n => '₡' + Number(n || 0).toLocaleString('es-CR');
-            document.getElementById('statPrecio').textContent = colones(data.precio);
-            document.getElementById('statRecaudado').textContent = colones(data.recaudado_total);
-            document.getElementById('statAsistieron').textContent = data.usadas + ' de ' + data.total;
+            _pintaStats(data);
+            _setCache('taquilla_stats', data);
         } catch (err) {
-            mostrarToast('Error al cargar estadísticas');
+            if(!cached) mostrarToast('Error al cargar estadísticas');
         }
     }
 
     async function cargarLista() {
+        const cached = _getCache('taquilla_listar');
+        if(cached && cached.entradas){ entradas = cached.entradas; renderTabla(); }
         try {
-            const res = await fetch('/api/listar');
+            const res = await fetch('/api/listar', {cache:'default'});
             if (res.status === 401) { location.href = '/login'; return; }
             const data = await res.json();
             entradas = data.entradas || [];
+            _setCache('taquilla_listar', data);
             renderTabla();
         } catch (err) {
-            document.getElementById('tablaBody').innerHTML =
+            if(!cached) document.getElementById('tablaBody').innerHTML =
                 '<tr><td colspan="5" class="vacio">Error al cargar</td></tr>';
         }
     }
@@ -338,6 +359,7 @@
         `).join('');
     }
 
+    function _bumpCache(){ try{ sessionStorage.removeItem('taquilla_stats'); sessionStorage.removeItem('taquilla_listar'); }catch{} }
     async function resetear(codigo) {
         if (!confirm('¿Marcar ' + codigo + ' como no utilizada?')) return;
         try {
@@ -350,6 +372,7 @@
             if (res.status === 401) { location.href = '/login'; return; }
             if (data.ok) {
                 mostrarToast('Entrada ' + codigo + ' restablecida');
+                _bumpCache();
                 cargarStats();
                 cargarLista();
             } else {
@@ -394,6 +417,7 @@
             if (res.status === 401) { location.href = '/login'; return; }
             if (data.ok) {
                 mostrarToast('Entradas del evento eliminadas');
+                _bumpCache();
                 cargarStats();
                 cargarLista();
             } else {
@@ -406,7 +430,7 @@
 
     document.getElementById('busqueda').addEventListener('input', renderTabla);
 
-    cargarStats();
-    cargarLista();
+    // paralelo: no bloquear stats esperando lista
+    Promise.all([cargarStats(), cargarLista()]);
 </script>
 {% endblock %}

@@ -68,6 +68,48 @@ app.config["SESSION_COOKIE_SECURE"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
+# -----------------------------------------------------------
+# Cache en memoria con TTL — ponytail: dict+time, sin Redis
+# Vercel serverless reinicia instancias, pero mientras viva
+# evita N hits a Supabase en 8-15s y baja TTFB al entrar.
+# -----------------------------------------------------------
+_CACHE: dict = {}
+
+def _cache_get(key):
+    v = _CACHE.get(key)
+    if not v:
+        return None
+    exp, data = v
+    if time.time() > exp:
+        _CACHE.pop(key, None)
+        return None
+    return data
+
+def _cache_set(key, data, ttl=8):
+    _CACHE[key] = (time.time() + ttl, data)
+
+def _cache_invalidate(prefix):
+    for k in list(_CACHE.keys()):
+        if k.startswith(prefix):
+            _CACHE.pop(k, None)
+
+@app.after_request
+def _add_cache_headers(resp):
+    # API GETs pesados: cache privado corto + stale-while-revalidate
+    # El browser pinta instantáneo al volver atrás/entrar, Supabase respira
+    if request.path.startswith("/api/"):
+        if request.method == "GET" and resp.status_code == 200:
+            if request.path in ("/api/stats", "/api/listar", "/api/contador",
+                                "/api/dashboard", "/api/eventos", "/api/colegios",
+                                "/api/mis_eventos"):
+                resp.headers["Cache-Control"] = "private, max-age=8, stale-while-revalidate=20"
+            else:
+                resp.headers["Cache-Control"] = "no-store"
+            resp.headers["Vary"] = "Cookie"
+        else:
+            resp.headers["Cache-Control"] = "no-store"
+    return resp
+
 # Nombre por defecto de la pagina (no atado a ningun evento en particular)
 NOMBRE_EVENTO_DEFAULT = os.environ.get("NOMBRE_EVENTO", "Sistema de Entradas")
 
@@ -500,6 +542,7 @@ def api_eventos_crear():
             else:
                 raise
         registrar_log("evento_crear", f"{nombre} | precio {precio}")
+        _cache_invalidate("dashboard:")
         return jsonify({"ok": True, "nombre": nombre, "precio": precio})
     except Exception:
         return jsonify({"ok": False, "error": "Ya existe un evento con ese nombre"}), 409
@@ -546,6 +589,8 @@ def api_evento_editar(evento_id):
 
     detalle = ", ".join(f"{k}: {v}" for k, v in cambios.items())
     registrar_log("evento_editar", f"id {evento_id} · {detalle}")
+    _cache_invalidate("dashboard:")
+    _cache_invalidate(f"stats:{evento_id}")
     return jsonify({"ok": True, "precio": cambios.get("precio_entrada")})
 
 
@@ -564,6 +609,9 @@ def api_evento_borrar(evento_id):
         nombre = resp.data[0]["nombre"]
         supabase.table(TABLA_EVENTOS).delete().eq("id", evento_id).execute()
         registrar_log("evento_borrar", f"{nombre} (id {evento_id})")
+        _cache_invalidate("dashboard:")
+        _cache_invalidate(f"stats:{evento_id}")
+        _cache_invalidate(f"listar:{evento_id}")
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -652,6 +700,10 @@ def api_generar():
             if resp.data:
                 log_ced = cedula_display if cedula_display else "sin cédula"
                 registrar_log("venta", f"{nombre} | cédula {log_ced} | código {codigo}")
+                _cache_invalidate(f"stats:{evento_id}")
+                _cache_invalidate(f"listar:{evento_id}")
+                _cache_invalidate(f"contador:{evento_id}")
+                _cache_invalidate("dashboard:")
                 return jsonify({"ok": True, "codigo": codigo, "id": resp.data[0]["id"],
                                 "nombre": nombre, "cedula": cedula_display, "precio": precio}), 201
         except Exception:
@@ -696,6 +748,10 @@ def api_validar():
     supabase.table(TABLA).update({"usado": True}) \
         .eq("evento_id", evento_id).eq("codigo", codigo).execute()
     registrar_log("escaneo", f"{codigo} — {origen} | válido, {resp.data[0].get('nombre', '')}")
+    _cache_invalidate(f"stats:{evento_id}")
+    _cache_invalidate(f"listar:{evento_id}")
+    _cache_invalidate(f"contador:{evento_id}")
+    _cache_invalidate("dashboard:")
 
     return jsonify({"ok": True, "estado": "valido", "codigo": codigo,
                     "nombre": resp.data[0].get("nombre", ""),
@@ -711,10 +767,16 @@ def api_contador():
     evento_id = session.get("evento_id")
     if not evento_id:
         return jsonify({"total": 0})
+    ck = f"contador:{evento_id}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return jsonify(cached)
     try:
         resp = supabase.table(TABLA).select("id", count="exact") \
             .eq("evento_id", evento_id).execute()
-        return jsonify({"total": resp.count})
+        data = {"total": resp.count}
+        _cache_set(ck, data, ttl=8)
+        return jsonify(data)
     except Exception:
         return jsonify({"total": 0})
 
@@ -733,6 +795,11 @@ def api_stats():
                         "precio": precio, "recaudado_total": 0,
                         "recaudado_usadas": 0, "recaudado_pendientes": 0})
 
+    ck = f"stats:{evento_id}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return jsonify(cached)
+
     try:
         ev = supabase.table(TABLA_EVENTOS).select("nombre,precio_entrada") \
             .eq("id", evento_id).execute()
@@ -746,13 +813,15 @@ def api_stats():
             .eq("evento_id", evento_id).eq("usado", True).execute().count
         pendientes = total - usadas
 
-        return jsonify({
+        data = {
             "total": total, "usadas": usadas, "pendientes": pendientes,
             "precio": precio,
             "recaudado_total": total * precio,
             "recaudado_usadas": usadas * precio,
             "recaudado_pendientes": pendientes * precio,
-        })
+        }
+        _cache_set(ck, data, ttl=8)
+        return jsonify(data)
     except Exception:
         return jsonify({"total": 0, "usadas": 0, "pendientes": 0,
                         "precio": precio, "recaudado_total": 0,
@@ -765,13 +834,19 @@ def api_listar():
     evento_id = session.get("evento_id")
     if not evento_id:
         return jsonify({"entradas": []})
+    ck = f"listar:{evento_id}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return jsonify(cached)
     try:
         resp = supabase.table(TABLA).select(
             "id,codigo,usado,creado_en,nombre,cedula,precio,vendedor"
         ).eq("evento_id", evento_id).order("id", desc=True).limit(500).execute()
         for r in resp.data or []:
             r["cedula"] = cedula_para_mostrar(r.get("cedula"))
-        return jsonify({"entradas": resp.data})
+        data = {"entradas": resp.data}
+        _cache_set(ck, data, ttl=8)
+        return jsonify(data)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -795,6 +870,10 @@ def api_reset():
         return jsonify({"ok": False, "error": "Código no encontrado"}), 404
 
     registrar_log("revertir_escaneo", f"código {codigo} marcado como no usado")
+    _cache_invalidate(f"stats:{evento_id}")
+    _cache_invalidate(f"listar:{evento_id}")
+    _cache_invalidate(f"contador:{evento_id}")
+    _cache_invalidate("dashboard:")
     return jsonify({"ok": True, "codigo": codigo})
 
 
@@ -810,6 +889,10 @@ def api_borrar_todas():
             .eq("evento_id", evento_id).execute().count
         supabase.rpc("reset_entradas", {"p_evento_id": int(evento_id)}).execute()
         registrar_log("borrado_total", f"{antes} entradas eliminadas del evento")
+        _cache_invalidate(f"stats:{evento_id}")
+        _cache_invalidate(f"listar:{evento_id}")
+        _cache_invalidate(f"contador:{evento_id}")
+        _cache_invalidate("dashboard:")
         return jsonify({"ok": True, "mensaje": "Entradas eliminadas"})
     except Exception as e:
         return jsonify({"ok": False,
@@ -1138,8 +1221,16 @@ def api_dashboard():
     """Estadisticas generales, por evento y por colegio (admin general).
 
     Una sola query de entradas (in_ sobre eventos visibles) en vez de
-    2-3 queries por evento.
+    2-3 queries por evento. Cacheada 15s por alcance.
     """
+    # cache key por alcance (colegio_id + set de eventos)
+    alcance = session.get("colegio_id") or "general"
+    # eventos_visibles ya filtra por alcance, pero necesitamos key antes
+    # usamos alcance directo para evitar recalcular ids dos veces
+    ck = f"dashboard:{alcance}"
+    cached = _cache_get(ck)
+    if cached is not None:
+        return jsonify(cached)
     eventos = eventos_visibles()
     ev_ids = [e["id"] for e in eventos]
 
@@ -1230,6 +1321,7 @@ def api_dashboard():
             ev["colegio_color"] = colores.get(cid) if cid else None
         respuesta["por_colegio"] = lista
 
+    _cache_set(ck, respuesta, ttl=15)
     return jsonify(respuesta)
 
 

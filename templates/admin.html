@@ -1131,6 +1131,10 @@
         const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opciones });
         return r.json();
     }
+    // ponytail: cache de dashboard en sessionStorage para primer pintado instantáneo
+    const _ADM_TTL = 15000;
+    function _admGet(k){ try{ const raw=sessionStorage.getItem(k); if(!raw) return null; const {t,v}=JSON.parse(raw); if(Date.now()-t>_ADM_TTL) return v; return v;}catch{return null;} }
+    function _admSet(k,v){ try{ sessionStorage.setItem(k, JSON.stringify({t:Date.now(),v})); }catch{} }
 
     // ---------- Navegación ----------
     function cambiarTab(nombre) {
@@ -1159,8 +1163,7 @@
         b.addEventListener('click', () => cambiarTab(b.dataset.ir)));
 
     // ---------- Dashboard ----------
-    async function cargarDashboard() {
-        const data = await api('/api/dashboard');
+    function _pintaDashboard(data){
         const g = data.general;
         if (!g) return [];
         document.getElementById('stTotal').textContent = g.total;
@@ -1183,17 +1186,13 @@
         document.getElementById('barRec').style.width = pctR + '%';
         document.getElementById('recPct').textContent = pctR + '% de asistencia';
 
-        // Guardar para el selector
         window._porEvento = data.por_evento || [];
         window._porColegio = data.por_colegio || [];
-
-        // Render inicial
         pintarComparativa(window._porEvento, window._porColegio, modoGrafica);
         pintarPorColegio(window._porColegio);
-
-        // Selector de gráfica (solo admin general)
         const seg = document.getElementById('segGrafica');
-        if (seg) {
+        if (seg && !seg._bound) {
+            seg._bound = true;
             seg.querySelectorAll('button').forEach(btn => {
                 btn.addEventListener('click', () => {
                     seg.querySelectorAll('button').forEach(b => b.classList.remove('activo'));
@@ -1204,7 +1203,13 @@
         }
         return window._porEvento;
     }
-
+    async function cargarDashboard() {
+        const cached = _admGet('taquilla_dashboard');
+        if(cached) _pintaDashboard(cached);
+        const data = await api('/api/dashboard');
+        _admSet('taquilla_dashboard', data);
+        return _pintaDashboard(data);
+    }
     function pintarPorColegio(porColegio) {
         const body = document.getElementById('colegioResumenBody');
         if (!body) return;

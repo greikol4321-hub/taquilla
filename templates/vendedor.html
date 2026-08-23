@@ -493,6 +493,7 @@
                 try { ticketBlob = await generarImagenTicket(); } catch (e) {}
 
                 document.getElementById('qrCard').style.display = 'block';
+                try{ sessionStorage.removeItem('taquilla_stats'); sessionStorage.removeItem('taquilla_listar'); sessionStorage.removeItem('taquilla_dashboard'); }catch{}
                 actualizarContador();
             } else {
                 mostrarToast(data.error || 'Error al generar entrada');
