@@ -461,7 +461,27 @@
                 })();
             } else {
                 if (typeof Html5Qrcode === 'undefined') {
-                    throw new Error('Html5Qrcode no cargó — revisá tu conexión o usá modo manual');
+                    // ponytail: intenta cargar dinámicamente si el CDN inicial fue bloqueado (adblock/red)
+                    const cdns = [
+                        'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js',
+                        'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js'
+                    ];
+                    let loaded = false;
+                    for (const url of cdns) {
+                        try {
+                            await new Promise((res, rej) => {
+                                const s = document.createElement('script');
+                                s.src = url;
+                                s.onload = () => res();
+                                s.onerror = () => rej(new Error('load fail '+url));
+                                document.head.appendChild(s);
+                            });
+                            if (typeof Html5Qrcode !== 'undefined') { loaded = true; break; }
+                        } catch (e) {}
+                    }
+                    if (!loaded || typeof Html5Qrcode === 'undefined') {
+                        throw new Error('Html5Qrcode no cargó — revisá tu conexión/adblock o usá modo manual');
+                    }
                 }
                 modoHtml5 = true;
                 if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
