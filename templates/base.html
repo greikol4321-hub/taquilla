@@ -429,6 +429,7 @@
             _legacyToast.className = 'toast ' + kind;
         }
         document.getElementById('btnLogout').addEventListener('click', async () => {
+            try{ sessionStorage.clear(); }catch{}
             await fetch('/api/logout', { method: 'POST' });
             location.href = '/login';
         });

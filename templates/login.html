@@ -135,6 +135,7 @@
             });
             const data = await res.json();
             if (res.ok && data.ok) {
+                try{ sessionStorage.clear(); }catch{}
                 location.href = data.destino || ('/' + data.rol);
             } else {
                 error.textContent = data.error || 'Error al ingresar';

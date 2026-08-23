@@ -268,14 +268,16 @@
 {% block scripts %}
 <script>
     let entradas = [];
+    const _EV = "{{ evento_id }}";
     // ponytail: sessionStorage stale-while-revalidate — pinta cache instantáneo, luego refresca
+    // clave por evento para no mezclar datos al cambiar de evento
     const _CACHE_TTL = 8000;
     function _getCache(k){
         try{
             const raw = sessionStorage.getItem(k);
             if(!raw) return null;
             const {t,v}=JSON.parse(raw);
-            if(Date.now()-t > _CACHE_TTL) return v; // stale igual sirve para pintar rápido
+            if(Date.now()-t > _CACHE_TTL*3){ sessionStorage.removeItem(k); return null; }
             return v;
         }catch{ return null; }
     }
@@ -291,28 +293,30 @@
     }
 
     async function cargarStats() {
-        const cached = _getCache('taquilla_stats');
+        const _kStats = `taquilla_stats_${_EV}`;
+        const cached = _getCache(_kStats);
         if(cached) _pintaStats(cached);
         try {
             const res = await fetch('/api/stats', {cache:'default'});
             if (res.status === 401) { location.href = '/login'; return; }
             const data = await res.json();
             _pintaStats(data);
-            _setCache('taquilla_stats', data);
+            _setCache(_kStats, data);
         } catch (err) {
             if(!cached) mostrarToast('Error al cargar estadísticas');
         }
     }
 
     async function cargarLista() {
-        const cached = _getCache('taquilla_listar');
+        const _kList = `taquilla_listar_${_EV}`;
+        const cached = _getCache(_kList);
         if(cached && cached.entradas){ entradas = cached.entradas; renderTabla(); }
         try {
             const res = await fetch('/api/listar', {cache:'default'});
             if (res.status === 401) { location.href = '/login'; return; }
             const data = await res.json();
             entradas = data.entradas || [];
-            _setCache('taquilla_listar', data);
+            _setCache(_kList, data);
             renderTabla();
         } catch (err) {
             if(!cached) document.getElementById('tablaBody').innerHTML =
@@ -359,7 +363,7 @@
         `).join('');
     }
 
-    function _bumpCache(){ try{ sessionStorage.removeItem('taquilla_stats'); sessionStorage.removeItem('taquilla_listar'); }catch{} }
+    function _bumpCache(){ try{ sessionStorage.removeItem(`taquilla_stats_${_EV}`); sessionStorage.removeItem(`taquilla_listar_${_EV}`); }catch{} }
     async function resetear(codigo) {
         if (!confirm('¿Marcar ' + codigo + ' como no utilizada?')) return;
         try {

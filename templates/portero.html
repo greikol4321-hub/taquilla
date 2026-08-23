@@ -480,7 +480,7 @@
             const data = await res.json();
             if (res.status === 401) { location.href = '/login'; return; }
             if (data.ok && data.estado === 'valido') {
-                try{ sessionStorage.removeItem('taquilla_stats'); sessionStorage.removeItem('taquilla_listar'); sessionStorage.removeItem('taquilla_dashboard'); }catch{}
+                try{ Object.keys(sessionStorage).forEach(k=>{ if(k.startsWith('taquilla_')) sessionStorage.removeItem(k); }); }catch{}
                 mostrarResultado('exito', null, data.codigo, data.nombre, data.cedula);
             } else {
                 mostrarResultado('error', data.error || 'Código inválido');

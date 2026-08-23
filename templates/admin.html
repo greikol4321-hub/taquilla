@@ -1131,9 +1131,11 @@
         const r = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opciones });
         return r.json();
     }
-    // ponytail: cache de dashboard en sessionStorage para primer pintado instantáneo
+    // ponytail: cache por usuario para no mezclar general vs colegio al cambiar de sesión
+    const _ADM_USER = "{{ usuario }}";
+    const _ADM_KEY = `taquilla_dashboard_${_ADM_USER}_${ES_GENERAL?'g':'c'}`;
     const _ADM_TTL = 15000;
-    function _admGet(k){ try{ const raw=sessionStorage.getItem(k); if(!raw) return null; const {t,v}=JSON.parse(raw); if(Date.now()-t>_ADM_TTL) return v; return v;}catch{return null;} }
+    function _admGet(k){ try{ const raw=sessionStorage.getItem(k); if(!raw) return null; const {t,v}=JSON.parse(raw); if(Date.now()-t>_ADM_TTL*2){ sessionStorage.removeItem(k); return null; } return v;}catch{return null;} }
     function _admSet(k,v){ try{ sessionStorage.setItem(k, JSON.stringify({t:Date.now(),v})); }catch{} }
 
     // ---------- Navegación ----------
@@ -1204,10 +1206,10 @@
         return window._porEvento;
     }
     async function cargarDashboard() {
-        const cached = _admGet('taquilla_dashboard');
+        const cached = _admGet(_ADM_KEY);
         if(cached) _pintaDashboard(cached);
         const data = await api('/api/dashboard');
-        _admSet('taquilla_dashboard', data);
+        _admSet(_ADM_KEY, data);
         return _pintaDashboard(data);
     }
     function pintarPorColegio(porColegio) {
