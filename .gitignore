@@ -7,3 +7,11 @@ entradas.db
 .playwright-mcp/
 supabase/.temp/
 verificacion-admin-dashboard.png
+# basura - no necesario para el sitio
+node_modules/
+package*.json
+load_test.py
+test_final.py
+.codebase-memory/
+*.log
+.DS_Store
