@@ -131,9 +131,21 @@ CEDULA_CR = re.compile(r'^\d{1,2}-\d{4}-\d{4}$')
 @app.context_processor
 def inject_evento():
     es_admin = session.get("rol") == "admin"
+    if es_admin:
+        nombre = "Panel de administración"
+    else:
+        nombre = session.get("evento_nombre")
+        if not nombre:
+            cid = session.get("colegio_id")
+            if cid:
+                try:
+                    nombre = supabase.table(TABLA_COLEGIOS).select("nombre").eq("id", cid).single().execute().data["nombre"]
+                except Exception:
+                    nombre = NOMBRE_EVENTO_DEFAULT
+            else:
+                nombre = NOMBRE_EVENTO_DEFAULT
     return {
-        "nombre_evento": ("Panel de administración" if es_admin
-                          else session.get("evento_nombre", NOMBRE_EVENTO_DEFAULT)),
+        "nombre_evento": nombre,
         "evento_id": session.get("evento_id"),
         "precio_entrada": session.get("precio_entrada", 0),
         "rol": session.get("rol", ""),
