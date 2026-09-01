@@ -15,3 +15,18 @@ test_final.py
 .codebase-memory/
 *.log
 .DS_Store
+
+# AI / design - local only, no versionar
+.muse/
+.claude/
+.agents/
+.opencode/
+.codex/
+.cursor/
+.specify/
+skills-lock.json
+opencode.md
+CLAUDE.md
+AGENTS.md
+tmp/
+.playwright-mcp/
